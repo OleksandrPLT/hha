@@ -1,0 +1,36 @@
+---
+import { locales, defaultLocale } from '../i18n/locales';
+
+// output: 'static' → немає доступу до заголовків запиту на build-time,
+// тож підбір мови гостя робимо в браузері через navigator.language.
+// Для ботів/no-JS — миттєвий фолбек на defaultLocale через <noscript>.
+const localesJson = JSON.stringify(locales);
+---
+
+<!doctype html>
+<html lang={defaultLocale}>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>H&amp;H apartments</title>
+		<meta http-equiv="refresh" content={`0; url=/${defaultLocale}`} />
+		<script is:inline define:vars={{ localesJson, defaultLocale }}>
+			var supported = JSON.parse(localesJson);
+			var langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+			var target = defaultLocale;
+			for (var i = 0; i < langs.length; i++) {
+				var primary = (langs[i] || '').slice(0, 2).toLowerCase();
+				if (supported.indexOf(primary) !== -1) {
+					target = primary;
+					break;
+				}
+			}
+			location.replace('/' + target);
+		</script>
+	</head>
+	<body>
+		<noscript>
+			<a href={`/${defaultLocale}`}>Continue</a>
+		</noscript>
+	</body>
+</html>

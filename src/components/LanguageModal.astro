@@ -1,0 +1,161 @@
+---
+// ТЗ §3: модальне вікно вибору мови при першому вході, до показу контенту.
+// Показується один раз на браузер (localStorage), незалежно від locale.
+import { locales, localeNames, type Locale } from '../i18n/locales';
+import { landing } from '../i18n/landing';
+
+interface Props {
+	locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = landing[locale].languageModal;
+---
+
+<div id="lang-modal" class="lang-modal" hidden>
+	<div class="lang-modal__scrim"></div>
+	<div class="lang-modal__card" role="dialog" aria-modal="true" aria-labelledby="lang-modal-heading">
+		<p id="lang-modal-heading" class="lang-modal__heading">{copy.heading}</p>
+		<p class="lang-modal__subheading">{copy.subheading}</p>
+		<div class="lang-modal__grid">
+			{
+				locales.map((l) => (
+					<a href={`/${l}`} class={`lang-modal__option ${l === locale ? 'is-current' : ''}`} data-lang-option data-locale={l}>
+						{localeNames[l]}
+					</a>
+				))
+			}
+		</div>
+		<button type="button" class="lang-modal__continue" id="lang-modal-continue">{copy.continueLabel}</button>
+	</div>
+</div>
+
+<script>
+	const STORAGE_KEY = 'hha-lang-chosen';
+	const modal = document.getElementById('lang-modal');
+	if (modal) {
+		let alreadyChosen = false;
+		try {
+			alreadyChosen = localStorage.getItem(STORAGE_KEY) === '1';
+		} catch {
+			// приватний режим / заблоковано — просто не показуємо модалку повторно в цій сесії
+			alreadyChosen = sessionStorage.getItem(STORAGE_KEY) === '1';
+		}
+
+		if (!alreadyChosen) {
+			modal.hidden = false;
+		}
+
+		function remember() {
+			try {
+				localStorage.setItem(STORAGE_KEY, '1');
+			} catch {
+				try {
+					sessionStorage.setItem(STORAGE_KEY, '1');
+				} catch {
+					/* ignore */
+				}
+			}
+		}
+
+		modal.querySelectorAll('[data-lang-option]').forEach((el) => {
+			el.addEventListener('click', remember);
+		});
+
+		document.getElementById('lang-modal-continue')?.addEventListener('click', () => {
+			remember();
+			modal.hidden = true;
+		});
+	}
+</script>
+
+<style>
+	/* :not([hidden]) — інакше однакова специфічність з UA-правилом
+	   [hidden]{display:none} програє порядку джерел, і modal.hidden = true
+	   в JS перестає щось приховувати. */
+	.lang-modal:not([hidden]) {
+		position: fixed;
+		inset: 0;
+		z-index: 100;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1.25rem;
+	}
+
+	.lang-modal__scrim {
+		position: absolute;
+		inset: 0;
+		background: rgba(11, 13, 18, 0.72);
+		backdrop-filter: blur(6px);
+	}
+
+	.lang-modal__card {
+		position: relative;
+		width: 100%;
+		max-width: 26rem;
+		background: var(--surface-dark);
+		border: 1px solid var(--border-dark);
+		border-radius: 1rem;
+		padding: 2rem 1.75rem;
+		text-align: center;
+		color: var(--cream);
+		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+	}
+
+	.lang-modal__heading {
+		margin: 0 0 0.5rem;
+		font-size: 1.25rem;
+		font-weight: 700;
+	}
+
+	.lang-modal__subheading {
+		margin: 0 0 1.5rem;
+		font-size: 0.9rem;
+		color: var(--cream-muted);
+	}
+
+	.lang-modal__grid {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 0.6rem;
+		margin-bottom: 1.25rem;
+	}
+
+	.lang-modal__option {
+		display: block;
+		padding: 0.7rem 0.5rem;
+		border-radius: 0.6rem;
+		border: 1px solid var(--border-dark);
+		background: var(--surface-dark-2);
+		color: var(--cream);
+		text-decoration: none;
+		font-size: 0.92rem;
+		font-weight: 600;
+		transition: border-color 0.15s ease, color 0.15s ease;
+	}
+
+	.lang-modal__option:hover {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+
+	.lang-modal__option.is-current {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+
+	.lang-modal__continue {
+		font: inherit;
+		background: none;
+		border: none;
+		color: var(--muted);
+		font-size: 0.82rem;
+		text-decoration: underline;
+		cursor: pointer;
+	}
+
+	.lang-modal__continue:hover {
+		color: var(--cream-muted);
+	}
+</style>

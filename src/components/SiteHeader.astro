@@ -1,0 +1,196 @@
+---
+import { locales, localeNames, type Locale } from '../i18n/locales';
+import { landing } from '../i18n/landing';
+import { property } from '../data/property';
+
+interface Props {
+	locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = landing[locale];
+---
+
+<header class="site-header">
+	<div class="site-header__inner">
+		<a class="site-header__brand" href={`/${locale}`}>
+			<span class="site-header__brand-main">H&amp;H</span>
+			<span class="site-header__brand-sub">apartments</span>
+		</a>
+
+		<nav class="site-header__nav" aria-label="Sections">
+			<a href="#about">{copy.nav.about}</a>
+			<a href="#rooms">{copy.nav.rooms}</a>
+			<a href="#buffet">{copy.nav.buffet}</a>
+			<a href="#location">{copy.nav.location}</a>
+			<a href="#contact">{copy.nav.contact}</a>
+		</nav>
+
+		<div class="site-header__actions">
+			<details class="lang-switch">
+				<summary aria-label="Language">{locale.toUpperCase()}</summary>
+				<ul>
+					{
+						locales.map((l) => (
+							<li>
+								<a href={`/${l}`} class={l === locale ? 'is-current' : ''}>
+									{localeNames[l]}
+								</a>
+							</li>
+						))
+					}
+				</ul>
+			</details>
+
+			<a class="site-header__cta" href={property.bookingUrl} target="_blank" rel="noopener noreferrer">
+				{copy.nav.bookNow}
+			</a>
+		</div>
+	</div>
+</header>
+
+<style>
+	.site-header {
+		position: sticky;
+		top: 0;
+		z-index: 40;
+		background: rgba(11, 13, 18, 0.9);
+		backdrop-filter: blur(10px);
+		border-bottom: 1px solid var(--border-dark);
+	}
+
+	.site-header__inner {
+		max-width: 72rem;
+		margin: 0 auto;
+		padding: 0.9rem 1.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+
+	.site-header__brand {
+		display: flex;
+		align-items: baseline;
+		gap: 0.35rem;
+		text-decoration: none;
+		color: var(--cream);
+		white-space: nowrap;
+	}
+
+	.site-header__brand-main {
+		font-weight: 800;
+		font-size: 1.15rem;
+		letter-spacing: -0.01em;
+	}
+
+	.site-header__brand-sub {
+		font-size: 0.8rem;
+		color: var(--cream-muted);
+	}
+
+	.site-header__nav {
+		display: flex;
+		gap: 1.5rem;
+		flex: 1;
+		justify-content: center;
+	}
+
+	.site-header__nav a {
+		color: var(--cream-muted);
+		text-decoration: none;
+		font-size: 0.9rem;
+		font-weight: 500;
+		white-space: nowrap;
+	}
+
+	.site-header__nav a:hover {
+		color: var(--accent);
+	}
+
+	.site-header__actions {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.lang-switch {
+		position: relative;
+	}
+
+	.lang-switch summary {
+		list-style: none;
+		cursor: pointer;
+		color: var(--cream-muted);
+		font-size: 0.82rem;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		border: 1px solid var(--border-dark);
+		border-radius: 0.5rem;
+		padding: 0.4rem 0.6rem;
+	}
+
+	.lang-switch summary::-webkit-details-marker {
+		display: none;
+	}
+
+	.lang-switch[open] summary {
+		color: var(--accent);
+		border-color: var(--accent);
+	}
+
+	.lang-switch ul {
+		position: absolute;
+		right: 0;
+		top: calc(100% + 0.4rem);
+		margin: 0;
+		padding: 0.4rem;
+		list-style: none;
+		background: var(--surface-dark);
+		border: 1px solid var(--border-dark);
+		border-radius: 0.6rem;
+		min-width: 9rem;
+		box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+	}
+
+	.lang-switch li a {
+		display: block;
+		padding: 0.4rem 0.6rem;
+		border-radius: 0.4rem;
+		color: var(--cream-muted);
+		text-decoration: none;
+		font-size: 0.85rem;
+	}
+
+	.lang-switch li a:hover {
+		background: var(--surface-dark-2);
+		color: var(--cream);
+	}
+
+	.lang-switch li a.is-current {
+		color: var(--accent);
+		font-weight: 700;
+	}
+
+	.site-header__cta {
+		background: var(--accent);
+		color: #241a0c;
+		text-decoration: none;
+		font-weight: 700;
+		font-size: 0.85rem;
+		padding: 0.55rem 1rem;
+		border-radius: 0.5rem;
+		white-space: nowrap;
+		transition: filter 0.15s ease;
+	}
+
+	.site-header__cta:hover {
+		filter: brightness(1.08);
+	}
+
+	@media (max-width: 860px) {
+		.site-header__nav {
+			display: none;
+		}
+	}
+</style>

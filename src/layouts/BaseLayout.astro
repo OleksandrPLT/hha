@@ -1,0 +1,54 @@
+---
+import '../styles/global.css';
+import { locales, htmlLang, type Locale } from '../i18n/locales';
+
+interface Props {
+	locale: Locale;
+	title: string;
+	description: string;
+	/** Шлях без мовного префікса, напр. "/" для головної. Потрібен для hreflang. */
+	path?: string;
+	/** JSON-LD об'єкт (schema.org) — серіалізується в <script type="application/ld+json">. */
+	schema?: Record<string, unknown>;
+}
+
+const { locale, title, description, path = '/', schema } = Astro.props;
+
+// ТЗ §8: hreflang між усіма мовними версіями однієї сторінки + x-default,
+// canonical на кожній мовній версії. Закладаємо з першої ж сторінки (Coming
+// Soon), не відкладаємо на пізніше.
+const cleanPath = path === '/' ? '' : path;
+const alternates = locales.map((l) => ({ locale: l, href: `${Astro.site}${l}${cleanPath}` }));
+const canonical = `${Astro.site}${locale}${cleanPath}`;
+const defaultHref = `${Astro.site}en${cleanPath}`;
+---
+
+<!doctype html>
+<html lang={htmlLang[locale]}>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>{title}</title>
+		<meta name="description" content={description} />
+
+		<link rel="canonical" href={canonical} />
+		{alternates.map(({ locale: l, href }) => <link rel="alternate" hreflang={l} href={href} />)}
+		<link rel="alternate" hreflang="x-default" href={defaultHref} />
+
+		<meta property="og:type" content="website" />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:url" content={canonical} />
+		<meta property="og:locale" content={htmlLang[locale]} />
+		<meta name="twitter:card" content="summary" />
+		<meta name="twitter:title" content={title} />
+		<meta name="twitter:description" content={description} />
+
+		<meta name="robots" content="index, follow" />
+
+		{schema && <script is:inline type="application/ld+json" set:html={JSON.stringify(schema)} />}
+	</head>
+	<body>
+		<slot />
+	</body>
+</html>

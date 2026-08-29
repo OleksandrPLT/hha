@@ -1,0 +1,120 @@
+---
+import { landing } from '../i18n/landing';
+import { property } from '../data/property';
+import type { Locale } from '../i18n/locales';
+
+interface Props {
+	locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = landing[locale];
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+	<div class="site-footer__inner">
+		<div class="site-footer__brand">
+			<span class="site-footer__brand-main">H&amp;H apartments</span>
+			<span class="site-footer__brand-sub">{property.propertyName} · {property.city}, {property.countryName}</span>
+		</div>
+
+		<div class="site-footer__contact">
+			<a href={`tel:${property.phoneE164}`}>{property.phoneDisplay}</a>
+			<a href={`mailto:${property.email}`}>{property.email}</a>
+		</div>
+
+		<div class="site-footer__legal">
+			<span>© {year} H&amp;H apartments. {copy.footer.rights}</span>
+			<a class="site-footer__credit" href="https://intech.org.ua" target="_blank" rel="noopener noreferrer">
+				<svg viewBox="0 0 40 40" width="14" height="14" aria-hidden="true">
+					<rect x="1" y="1" width="38" height="38" rx="10" stroke="currentColor" stroke-width="2" fill="none" />
+					<rect x="17" y="10" width="6" height="20" rx="3" fill="currentColor" />
+				</svg>
+				<span>{copy.footer.poweredBy} Intech</span>
+			</a>
+		</div>
+	</div>
+</footer>
+
+<style>
+	.site-footer {
+		background: var(--bg-dark);
+		color: var(--cream-muted);
+		border-top: 1px solid var(--border-dark);
+	}
+
+	.site-footer__inner {
+		max-width: 72rem;
+		margin: 0 auto;
+		padding: 2.5rem 1.25rem 2rem;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1.5rem 2rem;
+		align-items: flex-start;
+		justify-content: space-between;
+	}
+
+	.site-footer__brand {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+
+	.site-footer__brand-main {
+		color: var(--cream);
+		font-weight: 700;
+	}
+
+	.site-footer__brand-sub {
+		font-size: 0.82rem;
+	}
+
+	.site-footer__contact {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		font-size: 0.88rem;
+	}
+
+	.site-footer__contact a {
+		color: var(--cream-muted);
+		text-decoration: none;
+	}
+
+	.site-footer__contact a:hover {
+		color: var(--accent);
+	}
+
+	.site-footer__legal {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.5rem;
+		font-size: 0.78rem;
+		text-align: right;
+	}
+
+	.site-footer__credit {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		color: var(--muted);
+		text-decoration: none;
+	}
+
+	.site-footer__credit:hover {
+		color: var(--cream-muted);
+	}
+
+	@media (max-width: 640px) {
+		.site-footer__inner {
+			flex-direction: column;
+		}
+
+		.site-footer__legal {
+			align-items: flex-start;
+			text-align: left;
+		}
+	}
+</style>
