@@ -38,9 +38,36 @@ export default defineConfig({
 				locales: Object.fromEntries(locales.map((l) => [l, l])),
 				defaultLocale,
 			},
-			// "/" — це лише JS-редирект-заглушка (визначає мову гостя і йде на
-			// /<locale>), не контентна сторінка — не варто її індексувати.
-			filter: (page) => new URL(page).pathname !== '/',
+			// 2026-08-30, знайдено при перевірці живого sitemap.xml: @astrojs/sitemap
+			// автоматично добирає лише (а) статичні prerendered сторінки і (б)
+			// SSR-сторінки БЕЗ динамічних сегментів у шляху. Відколи весь публічний
+			// контент живе під [locale]-сегментом (динамічний, SSR — Фаза 3, для
+			// live-оновлень з адмінки), жодна реальна сторінка (лендінг/privacy/
+			// terms/news) в автоматичний sitemap не потрапляла — натомість туди
+			// потрапляли /admin/* (СЛУЖБОВІ, без параметрів у шляху, тому їх
+			// "видно"). Результат: sitemap.xml реально відсилав Google на панель
+			// адміна і не містив жодної контентної сторінки. Фікс: явно
+			// виключаємо службові розділи через filter, і явно перелічуємо
+			// реальні публічні URL через customPages (єдиний надійний спосіб для
+			// full-SSR динамічних маршрutів — сам @astrojs/sitemap enumerated їх
+			// не вміє).
+			filter: (page) => {
+				const path = new URL(page).pathname;
+				if (path === '/') return false;
+				if (path.startsWith('/admin')) return false;
+				if (path.startsWith('/api')) return false;
+				if (path.startsWith('/account') || /\/account(\/|$)/.test(path)) return false;
+				if (/\/checkin(\/|$)/.test(path)) return false;
+				if (/\/book(\/|$)/.test(path)) return false;
+				return true;
+			},
+			customPages: locales.flatMap((l) => [
+				`${site}/${l}`,
+				`${site}/${l}/privacy`,
+				`${site}/${l}/terms`,
+				`${site}/${l}/news`,
+				`${site}/${l}/news/site-launched`,
+			]),
 			// @astrojs/sitemap не додає x-default сам — дописуємо вручну поруч з
 			// уже згенерованими per-locale hreflang-посиланнями. lastmod — час
 			// білда (для статичного лендінгу немає per-page дати оновлення).
