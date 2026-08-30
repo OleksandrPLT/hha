@@ -50,6 +50,10 @@ export interface BookingCopy {
 		refLabel: string;
 		statusPending: string;
 		statusConfirmed: string;
+		statusCancelled: string;
+		statusCompleted: string;
+		paymentPaid: string;
+		paymentUnpaid: string;
 		payAtCheckinNote: string;
 		paidNote: string;
 		emailSent: string;
@@ -102,6 +106,10 @@ export const booking: Record<Locale, BookingCopy> = {
 			refLabel: 'Booking reference',
 			statusPending: 'Awaiting confirmation',
 			statusConfirmed: 'Confirmed',
+			statusCancelled: 'Cancelled',
+			statusCompleted: 'Completed',
+			paymentPaid: 'Paid',
+			paymentUnpaid: 'Unpaid',
 			payAtCheckinNote: 'Please pay on arrival (cash or card).',
 			paidNote: 'Payment received — thank you!',
 			emailSent: 'A confirmation has been sent to your email.',
@@ -152,6 +160,10 @@ export const booking: Record<Locale, BookingCopy> = {
 			refLabel: 'Broneeringu number',
 			statusPending: 'Ootab kinnitust',
 			statusConfirmed: 'Kinnitatud',
+			statusCancelled: 'Tühistatud',
+			statusCompleted: 'Lõppenud',
+			paymentPaid: 'Makstud',
+			paymentUnpaid: 'Maksmata',
 			payAtCheckinNote: 'Palun tasu saabumisel (sularaha või kaart).',
 			paidNote: 'Makse laekunud — aitäh!',
 			emailSent: 'Kinnitus on saadetud sinu e-postile.',
@@ -202,6 +214,10 @@ export const booking: Record<Locale, BookingCopy> = {
 			refLabel: 'Номер бронювання',
 			statusPending: 'Очікує підтвердження',
 			statusConfirmed: 'Підтверджено',
+			statusCancelled: 'Скасовано',
+			statusCompleted: 'Завершено',
+			paymentPaid: 'Оплачено',
+			paymentUnpaid: 'Не оплачено',
 			payAtCheckinNote: 'Будь ласка, оплатіть при заїзді (готівкою або карткою).',
 			paidNote: 'Оплату отримано — дякуємо!',
 			emailSent: 'Підтвердження надіслано на вашу пошту.',
@@ -252,6 +268,10 @@ export const booking: Record<Locale, BookingCopy> = {
 			refLabel: 'Номер бронирования',
 			statusPending: 'Ожидает подтверждения',
 			statusConfirmed: 'Подтверждено',
+			statusCancelled: 'Отменено',
+			statusCompleted: 'Завершено',
+			paymentPaid: 'Оплачено',
+			paymentUnpaid: 'Не оплачено',
 			payAtCheckinNote: 'Пожалуйста, оплатите при заезде (наличными или картой).',
 			paidNote: 'Оплата получена — спасибо!',
 			emailSent: 'Подтверждение отправлено на вашу почту.',
@@ -302,6 +322,10 @@ export const booking: Record<Locale, BookingCopy> = {
 			refLabel: 'Rezervācijas numurs',
 			statusPending: 'Gaida apstiprinājumu',
 			statusConfirmed: 'Apstiprināts',
+			statusCancelled: 'Atcelts',
+			statusCompleted: 'Pabeigts',
+			paymentPaid: 'Apmaksāts',
+			paymentUnpaid: 'Nav apmaksāts',
 			payAtCheckinNote: 'Lūdzu, samaksā ierodoties (skaidrā naudā vai ar karti).',
 			paidNote: 'Maksājums saņemts — paldies!',
 			emailSent: 'Apstiprinājums nosūtīts uz tavu e-pastu.',
@@ -352,6 +376,10 @@ export const booking: Record<Locale, BookingCopy> = {
 			refLabel: 'Varausnumero',
 			statusPending: 'Odottaa vahvistusta',
 			statusConfirmed: 'Vahvistettu',
+			statusCancelled: 'Peruttu',
+			statusCompleted: 'Päättynyt',
+			paymentPaid: 'Maksettu',
+			paymentUnpaid: 'Maksamatta',
 			payAtCheckinNote: 'Maksa saapuessasi (käteinen tai kortti).',
 			paidNote: 'Maksu vastaanotettu — kiitos!',
 			emailSent: 'Vahvistus on lähetetty sähköpostiisi.',

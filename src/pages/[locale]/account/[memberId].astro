@@ -13,11 +13,13 @@ import SiteFooter from '../../../components/SiteFooter.astro';
 import { isLocale, defaultLocale, htmlLang, type Locale } from '../../../i18n/locales';
 import { account } from '../../../i18n/account';
 import { db } from '../../../db/client';
-import { guests } from '../../../db/schema';
-import { eq } from 'drizzle-orm';
+import { guests, bookings, rooms } from '../../../db/schema';
+import { eq, desc } from 'drizzle-orm';
 import { pointsToEuros } from '../../../data/loyalty';
 import { countries, isoToFlag } from '../../../data/countries';
 import { formatMemberId, memberVerifyUrl, generateMemberQrSvg } from '../../../lib/memberCard';
+import { booking as bookingCopy } from '../../../i18n/booking';
+import { currency } from '../../../data/pricing';
 
 const rawLocale = Astro.params.locale;
 if (!rawLocale || !isLocale(rawLocale)) {
@@ -66,6 +68,37 @@ const initials = guest.fullName
 
 const verifyUrl = memberVerifyUrl(Astro.site ?? Astro.url, locale, memberId);
 const qrSvg = await generateMemberQrSvg(verifyUrl);
+
+// "Історія проживань" (Фаза 4) — власні бронювання гостя, найновіші перші.
+// Гостьові бронювання (без акаунта) сюди не потрапляють — прив'язка йде
+// лише через guestId, зроблену в момент оформлення (якщо гість тоді був
+// залогінений).
+const myBookings = db.select().from(bookings).where(eq(bookings.guestId, guestId)).orderBy(desc(bookings.createdAt)).all();
+const roomsById = new Map(db.select().from(rooms).all().map((r) => [r.id, r]));
+const bkCopy = bookingCopy[locale];
+
+function roomTitleFor(roomId: number): string {
+	const room = roomsById.get(roomId);
+	if (!room) return '—';
+	try {
+		const parsed = JSON.parse(room.titles) as Record<string, string>;
+		return parsed[locale] ?? parsed.en ?? room.slug;
+	} catch {
+		return room.slug;
+	}
+}
+
+const bookingStatusLabels: Record<string, string> = {
+	pending: bkCopy.confirmation.statusPending,
+	confirmed: bkCopy.confirmation.statusConfirmed,
+	cancelled: bkCopy.confirmation.statusCancelled,
+	completed: bkCopy.confirmation.statusCompleted,
+};
+const bookingPaymentLabels: Record<string, string> = {
+	paid: bkCopy.confirmation.paymentPaid,
+	unpaid: bkCopy.confirmation.paymentUnpaid,
+	refunded: bkCopy.confirmation.paymentUnpaid,
+};
 ---
 
 <BaseLayout locale={locale} title={`${copy.dashboard.title} — Hostel & Hotel Apartments`} description={copy.dashboard.title} path={`/account/${memberId}`}>
@@ -304,7 +337,34 @@ const qrSvg = await generateMemberQrSvg(verifyUrl);
 					<div class="section-head">
 						<h2>{copy.dashboard.stayHistoryTitle}</h2>
 					</div>
-					<p class="empty-note">{copy.dashboard.stayHistoryEmpty}</p>
+					{
+						myBookings.length === 0 ? (
+							<p class="empty-note">{copy.dashboard.stayHistoryEmpty}</p>
+						) : (
+							<ul class="booking-list">
+								{myBookings.map((b) => (
+									<li class="booking-item">
+										<div class="booking-item__main">
+											<p class="booking-item__room">{roomTitleFor(b.roomId)}</p>
+											<p class="booking-item__dates">
+												{b.checkIn} → {b.checkOut} · {b.nights} {bkCopy.page.summaryNights}
+											</p>
+										</div>
+										<div class="booking-item__side">
+											<p class="booking-item__total">
+												{currency}
+												{(b.totalCents / 100).toFixed(2)}
+											</p>
+											<div class="booking-item__badges">
+												<span class={`bk-badge bk-badge--${b.status}`}>{bookingStatusLabels[b.status] ?? b.status}</span>
+												<span class={`bk-badge ${b.paymentStatus === 'paid' ? 'bk-badge--paid' : ''}`}>{bookingPaymentLabels[b.paymentStatus] ?? b.paymentStatus}</span>
+											</div>
+										</div>
+									</li>
+								))}
+							</ul>
+						)
+					}
 				</section>
 			</div>
 		</div>
@@ -610,6 +670,78 @@ const qrSvg = await generateMemberQrSvg(verifyUrl);
 			color: var(--text-dark-muted);
 			margin: 0;
 			font-size: 0.88rem;
+		}
+
+		.booking-list {
+			list-style: none;
+			margin: 0;
+			padding: 0;
+			display: flex;
+			flex-direction: column;
+			gap: 0.7rem;
+		}
+
+		.booking-item {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 1rem;
+			padding: 0.9rem 1rem;
+			border: 1px solid var(--border-light);
+			border-radius: 0.7rem;
+			flex-wrap: wrap;
+		}
+
+		.booking-item__room {
+			margin: 0 0 0.15rem;
+			font-weight: 700;
+			font-size: 0.92rem;
+		}
+
+		.booking-item__dates {
+			margin: 0;
+			font-size: 0.82rem;
+			color: var(--text-dark-muted);
+		}
+
+		.booking-item__side {
+			display: flex;
+			flex-direction: column;
+			align-items: flex-end;
+			gap: 0.35rem;
+		}
+
+		.booking-item__total {
+			margin: 0;
+			font-weight: 700;
+			font-size: 0.95rem;
+		}
+
+		.booking-item__badges {
+			display: flex;
+			gap: 0.35rem;
+		}
+
+		.bk-badge {
+			border-radius: 999px;
+			padding: 0.2rem 0.6rem;
+			font-size: 0.7rem;
+			font-weight: 700;
+			background: var(--border-light);
+			color: var(--text-dark-muted);
+			white-space: nowrap;
+		}
+
+		.bk-badge--confirmed,
+		.bk-badge--completed,
+		.bk-badge--paid {
+			background: rgba(63, 122, 79, 0.12);
+			color: #2e7d4f;
+		}
+
+		.bk-badge--cancelled {
+			background: rgba(179, 67, 47, 0.12);
+			color: #b3432f;
 		}
 
 		@media (max-width: 860px) {
