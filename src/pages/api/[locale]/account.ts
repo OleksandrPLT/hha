@@ -11,6 +11,7 @@ import { guests } from '../../../db/schema';
 import { eq } from 'drizzle-orm';
 import { pointsToEuros } from '../../../data/loyalty';
 import { countries, isoToFlag } from '../../../data/countries';
+import { formatMemberId, memberVerifyUrl, generateMemberQrSvg } from '../../../lib/memberCard';
 
 export const prerender = false;
 
@@ -27,7 +28,7 @@ function formatDate(raw: string | null, locale: Locale): string | null {
 	return new Intl.DateTimeFormat(htmlLang[locale], { dateStyle: 'medium' }).format(d);
 }
 
-export const GET: APIRoute = async ({ params, session }) => {
+export const GET: APIRoute = async ({ params, session, site, url }) => {
 	const rawLocale = params.locale;
 	const locale: Locale = rawLocale && isLocale(rawLocale) ? rawLocale : 'en';
 
@@ -48,10 +49,16 @@ export const GET: APIRoute = async ({ params, session }) => {
 		.map((p) => p[0]!.toUpperCase())
 		.join('');
 
+	const memberId = formatMemberId(guest.id);
+	const verifyUrl = memberVerifyUrl(site ?? url, locale, memberId);
+	const qrSvg = await generateMemberQrSvg(verifyUrl);
+
 	return new Response(
 		JSON.stringify({
 			fullName: guest.fullName,
 			initials,
+			memberId,
+			qrSvg,
 			email: guest.email,
 			phone: guest.phone,
 			isCompany: guest.isCompany,

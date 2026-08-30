@@ -60,6 +60,12 @@ const d = copy.dashboard;
 				<p class="am-loyalty__note">{d.loyaltyNote}</p>
 			</div>
 
+			<div class="am-qr">
+				<div class="am-qr__code" data-field-html="qrSvg"></div>
+				<p class="am-qr__id" data-field="memberId">···</p>
+				<p class="am-qr__note">{d.scanNote}</p>
+			</div>
+
 			<form method="POST" action={`/${locale}/account/logout`} class="am-logout-form">
 				<button type="submit" class="am-logout">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
@@ -168,10 +174,14 @@ const d = copy.dashboard;
 				<p class="am-empty">{d.stayHistoryEmpty}</p>
 			</div>
 
-			<a href={`/${locale}/account`} class="am-full-link">
-				{d.viewFullProfile}
-				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
-			</a>
+			<div class="am-links-row">
+				<a href={`/${locale}/account`} class="am-full-link">
+					{d.viewFullProfile}
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
+				</a>
+				<a href={`/${locale}/account/edit`} class="am-edit-link">{d.editProfile}</a>
+				<a href={`/${locale}/account/delete`} class="am-delete-link">{d.deleteAccount}</a>
+			</div>
 		</div>
 	</div>
 </div>
@@ -207,6 +217,11 @@ const d = copy.dashboard;
 			}
 		}
 
+		function setHtml(field, html) {
+			var el = modal.querySelector('[data-field-html="' + field + '"]');
+			if (el) el.innerHTML = html || '';
+		}
+
 		function load() {
 			fetch('/api/' + locale + '/account', { credentials: 'same-origin' })
 				.then(function (r) {
@@ -221,6 +236,8 @@ const d = copy.dashboard;
 					setText('loyaltyPoints', data.loyaltyPoints);
 					setText('loyaltyEuros', data.loyaltyEuros);
 					setText('accountType', data.isCompany ? modal.dataset.companyLabel : modal.dataset.individualLabel);
+					setText('memberId', data.memberId);
+					setHtml('qrSvg', data.qrSvg);
 					setText('email', data.email);
 					setText('phone', data.phone);
 					setRow('nationality', data.nationality);
@@ -460,6 +477,43 @@ const d = copy.dashboard;
 		color: var(--cream-muted);
 	}
 
+	.am-qr {
+		position: relative;
+		background: rgba(245, 245, 243, 0.06);
+		border: 1px solid rgba(245, 245, 243, 0.14);
+		border-radius: 0.9rem;
+		padding: 0.9rem;
+		text-align: center;
+	}
+
+	.am-qr__code {
+		display: flex;
+		justify-content: center;
+		margin-bottom: 0.5rem;
+	}
+
+	.am-qr__code :global(svg) {
+		width: 6.5rem;
+		height: 6.5rem;
+		border-radius: 0.4rem;
+	}
+
+	.am-qr__id {
+		margin: 0 0 0.25rem;
+		font-family: var(--font-display);
+		font-weight: 600;
+		font-size: 0.85rem;
+		color: var(--cream);
+		letter-spacing: 0.02em;
+	}
+
+	.am-qr__note {
+		margin: 0;
+		font-size: 0.68rem;
+		line-height: 1.4;
+		color: var(--cream-muted);
+	}
+
 	.am-logout-form {
 		position: relative;
 		margin-top: auto;
@@ -611,9 +665,15 @@ const d = copy.dashboard;
 		color: var(--text-dark-muted);
 	}
 
-	.am-full-link {
+	.am-links-row {
 		margin-top: auto;
-		align-self: flex-start;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem 1rem;
+	}
+
+	.am-full-link {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.4rem;
@@ -629,6 +689,32 @@ const d = copy.dashboard;
 	}
 
 	.am-full-link:hover {
+		text-decoration: underline;
+	}
+
+	.am-edit-link,
+	.am-delete-link {
+		font-size: 0.78rem;
+		font-weight: 600;
+		text-decoration: none;
+	}
+
+	.am-edit-link {
+		color: var(--text-dark-muted);
+	}
+
+	.am-edit-link:hover {
+		color: var(--text-dark);
+		text-decoration: underline;
+	}
+
+	.am-delete-link {
+		color: #b3432f;
+		opacity: 0.85;
+	}
+
+	.am-delete-link:hover {
+		opacity: 1;
 		text-decoration: underline;
 	}
 

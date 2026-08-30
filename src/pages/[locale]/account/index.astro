@@ -9,6 +9,7 @@ import { guests } from '../../../db/schema';
 import { eq } from 'drizzle-orm';
 import { pointsToEuros } from '../../../data/loyalty';
 import { countries, isoToFlag } from '../../../data/countries';
+import { formatMemberId, memberVerifyUrl, generateMemberQrSvg } from '../../../lib/memberCard';
 
 const rawLocale = Astro.params.locale;
 if (!rawLocale || !isLocale(rawLocale)) {
@@ -49,6 +50,10 @@ const initials = guest.fullName
 	.slice(0, 2)
 	.map((p) => p[0]!.toUpperCase())
 	.join('');
+
+const memberId = formatMemberId(guest.id);
+const verifyUrl = memberVerifyUrl(Astro.site ?? Astro.url, locale, memberId);
+const qrSvg = await generateMemberQrSvg(verifyUrl);
 ---
 
 <BaseLayout locale={locale} title={`${copy.dashboard.title} — Hostel & Hotel Apartments`} description={copy.dashboard.title} path="/account">
@@ -57,6 +62,12 @@ const initials = guest.fullName
 	<main class="dash">
 		<div class="dash-shell">
 			<aside class="dash-sidebar">
+				<div class="member-card">
+					<div class="member-card__qr" set:html={qrSvg} />
+					<p class="member-card__id">{memberId}</p>
+					<p class="member-card__note">{copy.dashboard.scanNote}</p>
+				</div>
+
 				<div class="loyalty-card">
 					<p class="loyalty-card__label">{copy.dashboard.loyaltyPoints}</p>
 					<p class="loyalty-card__points">
@@ -97,7 +108,26 @@ const initials = guest.fullName
 								{copy.dashboard.navStayHistory}
 							</a>
 						</li>
+						<li>
+							<a href={`/${locale}/account/edit`} class="dash-nav__link">
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+									><path
+										d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"></path></svg
+								>
+								{copy.dashboard.editProfile}
+							</a>
+						</li>
 					</ul>
+
+					<div class="dash-nav-divider"></div>
+
+					<a href={`/${locale}/account/delete`} class="dash-nav__link dash-nav__danger">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+							><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"></path><path
+								d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"></path></svg
+						>
+						{copy.dashboard.deleteAccount}
+					</a>
 
 					<div class="dash-nav-divider"></div>
 
@@ -287,6 +317,41 @@ const initials = guest.fullName
 		}
 
 		/* ---------- Sidebar ---------- */
+		.member-card {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 1rem;
+			padding: 1.1rem;
+			text-align: center;
+			margin-bottom: 1.25rem;
+		}
+
+		.member-card__qr {
+			display: flex;
+			justify-content: center;
+			margin-bottom: 0.6rem;
+		}
+
+		.member-card__qr :global(svg) {
+			width: 9rem;
+			height: 9rem;
+		}
+
+		.member-card__id {
+			margin: 0 0 0.3rem;
+			font-family: var(--font-display);
+			font-weight: 600;
+			font-size: 0.95rem;
+			letter-spacing: 0.02em;
+		}
+
+		.member-card__note {
+			margin: 0;
+			font-size: 0.72rem;
+			line-height: 1.4;
+			color: var(--text-dark-muted);
+		}
+
 		.loyalty-card {
 			background: linear-gradient(160deg, var(--bg-dark) 0%, var(--surface-dark-2) 100%);
 			border-radius: 1rem;
@@ -376,6 +441,18 @@ const initials = guest.fullName
 		.dash-nav__logout:hover {
 			background: rgba(179, 67, 47, 0.08);
 			color: #b3432f;
+		}
+
+		.dash-nav__danger {
+			color: #b3432f;
+			text-decoration: none;
+			font-size: 0.82rem;
+			opacity: 0.85;
+		}
+
+		.dash-nav__danger:hover {
+			background: rgba(179, 67, 47, 0.08);
+			opacity: 1;
 		}
 
 		/* ---------- Main ---------- */

@@ -24,11 +24,14 @@ export interface AccountCopy {
 		companyAddress: string;
 		companyLookupNote: string;
 		marketingConsent: string;
+		dataProcessingConsent: string;
+		dataProcessingConsentLink: string;
 		submit: string;
 		haveAccount: string;
 		loginLink: string;
 		errorEmailTaken: string;
 		errorPasswordMismatch: string;
+		errorConsentRequired: string;
 		errorGeneric: string;
 	};
 	login: {
@@ -74,6 +77,8 @@ export interface AccountCopy {
 		navAccountDetails: string;
 		navStayHistory: string;
 		accountType: string;
+		memberId: string;
+		scanNote: string;
 		loyaltyPoints: string;
 		loyaltyNote: string;
 		accountDetailsTitle: string;
@@ -84,6 +89,27 @@ export interface AccountCopy {
 		stayHistoryEmpty: string;
 		logout: string;
 		viewFullProfile: string;
+		editProfile: string;
+		deleteAccount: string;
+	};
+	editProfile: {
+		title: string;
+		subtitle: string;
+		submit: string;
+		successMessage: string;
+		backToAccount: string;
+		errorEmailTaken: string;
+		errorGeneric: string;
+	};
+	deleteAccount: {
+		title: string;
+		warning: string;
+		passwordLabel: string;
+		confirmLabel: string;
+		submit: string;
+		cancel: string;
+		errorInvalidPassword: string;
+		errorGeneric: string;
 	};
 }
 
@@ -116,11 +142,14 @@ export const account: Record<Locale, AccountCopy> = {
 			companyAddress: 'Company address',
 			companyLookupNote: "We'll confirm company details with you directly — automatic lookup isn't connected yet.",
 			marketingConsent: 'I agree to receive booking-related emails and occasional offers.',
+			dataProcessingConsent: 'I agree to the processing of my personal data as described in the',
+			dataProcessingConsentLink: 'Privacy Policy',
 			submit: 'Create account',
 			haveAccount: 'Already have an account?',
 			loginLink: 'Sign in',
 			errorEmailTaken: 'An account with this email already exists.',
 			errorPasswordMismatch: "Passwords don't match.",
+			errorConsentRequired: 'Please agree to the processing of your personal data to continue.',
 			errorGeneric: 'Something went wrong. Please try again.',
 		},
 		login: {
@@ -173,6 +202,8 @@ export const account: Record<Locale, AccountCopy> = {
 			navAccountDetails: 'Account details',
 			navStayHistory: 'Stay history',
 			accountType: 'Account type',
+			memberId: 'Member ID',
+			scanNote: 'Show this at reception for quick check-in.',
 			loyaltyPoints: 'Loyalty points',
 			loyaltyNote: 'Earn 15 points for every night you stay. 10 points = €1 — redeemable on a future stay. Points will start counting once online booking launches.',
 			accountDetailsTitle: 'Account details',
@@ -183,6 +214,27 @@ export const account: Record<Locale, AccountCopy> = {
 			stayHistoryEmpty: "You don't have any stays yet — this will fill in once online booking launches.",
 			logout: 'Sign out',
 			viewFullProfile: 'Open full profile',
+			editProfile: 'Edit profile',
+			deleteAccount: 'Delete my data',
+		},
+		editProfile: {
+			title: 'Edit profile',
+			subtitle: 'Update your details below.',
+			submit: 'Save changes',
+			successMessage: 'Your profile has been updated.',
+			backToAccount: '← Back to my account',
+			errorEmailTaken: 'An account with this email already exists.',
+			errorGeneric: 'Something went wrong. Please try again.',
+		},
+		deleteAccount: {
+			title: 'Delete my data',
+			warning: 'This permanently deletes your account and all data we hold about you, including your loyalty points. This cannot be undone.',
+			passwordLabel: 'Confirm your password',
+			confirmLabel: 'I understand this cannot be undone',
+			submit: 'Permanently delete my account',
+			cancel: 'Cancel',
+			errorInvalidPassword: 'Incorrect password.',
+			errorGeneric: 'Something went wrong. Please try again.',
 		},
 	},
 	et: {
@@ -209,11 +261,14 @@ export const account: Record<Locale, AccountCopy> = {
 			companyAddress: 'Ettevõtte aadress',
 			companyLookupNote: 'Täpsustame ettevõtte andmed teiega otse — automaatne päring pole veel ühendatud.',
 			marketingConsent: 'Nõustun broneeringutega seotud e-kirjade ja aeg-ajalt pakkumiste saamisega.',
+			dataProcessingConsent: 'Nõustun oma isikuandmete töötlemisega vastavalt',
+			dataProcessingConsentLink: 'privaatsuspoliitikale',
 			submit: 'Loo konto',
 			haveAccount: 'Kas sul on juba konto?',
 			loginLink: 'Logi sisse',
 			errorEmailTaken: 'Selle e-postiga konto on juba olemas.',
 			errorPasswordMismatch: 'Paroolid ei kattu.',
+			errorConsentRequired: 'Jätkamiseks nõustu oma isikuandmete töötlemisega.',
 			errorGeneric: 'Midagi läks valesti. Palun proovi uuesti.',
 		},
 		login: {
@@ -266,6 +321,8 @@ export const account: Record<Locale, AccountCopy> = {
 			navAccountDetails: 'Konto andmed',
 			navStayHistory: 'Viibimiste ajalugu',
 			accountType: 'Konto tüüp',
+			memberId: 'Liikme ID',
+			scanNote: 'Näita seda registreerimisel kiireks sisseregistreerimiseks.',
 			loyaltyPoints: 'Lojaalsuspunktid',
 			loyaltyNote: 'Iga öö eest 15 punkti. 10 punkti = 1 € — kasutatav järgmisel viibimisel. Punktid hakkavad kogunema, kui veebibroneerimine käivitub.',
 			accountDetailsTitle: 'Konto andmed',
@@ -276,6 +333,27 @@ export const account: Record<Locale, AccountCopy> = {
 			stayHistoryEmpty: 'Sul pole veel ühtegi viibimist — see täitub, kui veebibroneerimine käivitub.',
 			logout: 'Logi välja',
 			viewFullProfile: 'Ava täisprofiil',
+			editProfile: 'Muuda profiili',
+			deleteAccount: 'Kustuta minu andmed',
+		},
+		editProfile: {
+			title: 'Muuda profiili',
+			subtitle: 'Uuenda oma andmeid allpool.',
+			submit: 'Salvesta muudatused',
+			successMessage: 'Sinu profiil on uuendatud.',
+			backToAccount: '← Tagasi minu konto juurde',
+			errorEmailTaken: 'Selle e-postiga konto on juba olemas.',
+			errorGeneric: 'Midagi läks valesti. Palun proovi uuesti.',
+		},
+		deleteAccount: {
+			title: 'Kustuta minu andmed',
+			warning: 'See kustutab jäädavalt sinu konto ja kõik meie hoitavad andmed, sh lojaalsuspunktid. Seda ei saa tagasi võtta.',
+			passwordLabel: 'Kinnita oma parool',
+			confirmLabel: 'Saan aru, et seda ei saa tagasi võtta',
+			submit: 'Kustuta konto jäädavalt',
+			cancel: 'Loobu',
+			errorInvalidPassword: 'Vale parool.',
+			errorGeneric: 'Midagi läks valesti. Palun proovi uuesti.',
 		},
 	},
 	uk: {
@@ -302,11 +380,14 @@ export const account: Record<Locale, AccountCopy> = {
 			companyAddress: 'Адреса компанії',
 			companyLookupNote: 'Дані компанії уточнимо з вами напряму — автоматичний пошук поки не підключений.',
 			marketingConsent: "Погоджуюсь отримувати листи щодо бронювання та іноді — спецпропозиції.",
+			dataProcessingConsent: 'Погоджуюсь на обробку моїх персональних даних згідно з',
+			dataProcessingConsentLink: 'Політикою конфіденційності',
 			submit: 'Створити акаунт',
 			haveAccount: 'Вже є акаунт?',
 			loginLink: 'Увійти',
 			errorEmailTaken: 'Акаунт з таким email вже існує.',
 			errorPasswordMismatch: 'Паролі не збігаються.',
+			errorConsentRequired: 'Щоб продовжити, погодьтесь на обробку персональних даних.',
 			errorGeneric: 'Щось пішло не так. Спробуйте ще раз.',
 		},
 		login: {
@@ -359,6 +440,8 @@ export const account: Record<Locale, AccountCopy> = {
 			navAccountDetails: 'Дані акаунту',
 			navStayHistory: 'Історія проживань',
 			accountType: 'Тип акаунту',
+			memberId: 'Номер гостя',
+			scanNote: 'Покажіть це на рецепції для швидкого заселення.',
 			loyaltyPoints: 'Бонусні бали',
 			loyaltyNote: 'За кожну ніч проживання — 15 балів. 10 балів = 1 € — можна використати під час наступного проживання. Бали почнуть нараховуватись, коли запрацює онлайн-бронювання.',
 			accountDetailsTitle: 'Дані акаунту',
@@ -369,6 +452,27 @@ export const account: Record<Locale, AccountCopy> = {
 			stayHistoryEmpty: "У вас ще немає проживань — тут з'явиться, коли запрацює онлайн-бронювання.",
 			logout: 'Вийти',
 			viewFullProfile: 'Відкрити повний профіль',
+			editProfile: 'Редагувати профіль',
+			deleteAccount: 'Видалити мої дані',
+		},
+		editProfile: {
+			title: 'Редагувати профіль',
+			subtitle: 'Оновіть свої дані нижче.',
+			submit: 'Зберегти зміни',
+			successMessage: 'Ваш профіль оновлено.',
+			backToAccount: '← Назад до кабінету',
+			errorEmailTaken: 'Акаунт з таким email вже існує.',
+			errorGeneric: 'Щось пішло не так. Спробуйте ще раз.',
+		},
+		deleteAccount: {
+			title: 'Видалити мої дані',
+			warning: 'Це назавжди видалить ваш акаунт і всі дані, які ми зберігаємо про вас, включно з бонусними балами. Це неможливо скасувати.',
+			passwordLabel: 'Підтвердьте пароль',
+			confirmLabel: 'Я розумію, що це незворотно',
+			submit: 'Видалити акаунт назавжди',
+			cancel: 'Скасувати',
+			errorInvalidPassword: 'Невірний пароль.',
+			errorGeneric: 'Щось пішло не так. Спробуйте ще раз.',
 		},
 	},
 	ru: {
@@ -395,11 +499,14 @@ export const account: Record<Locale, AccountCopy> = {
 			companyAddress: 'Адрес компании',
 			companyLookupNote: 'Данные компании уточним с вами напрямую — автоматический поиск пока не подключён.',
 			marketingConsent: 'Согласен(на) получать письма по бронированию и иногда — спецпредложения.',
+			dataProcessingConsent: 'Согласен(на) на обработку моих персональных данных согласно',
+			dataProcessingConsentLink: 'Политике конфиденциальности',
 			submit: 'Создать аккаунт',
 			haveAccount: 'Уже есть аккаунт?',
 			loginLink: 'Войти',
 			errorEmailTaken: 'Аккаунт с таким email уже существует.',
 			errorPasswordMismatch: 'Пароли не совпадают.',
+			errorConsentRequired: 'Чтобы продолжить, согласитесь на обработку персональных данных.',
 			errorGeneric: 'Что-то пошло не так. Попробуйте ещё раз.',
 		},
 		login: {
@@ -452,6 +559,8 @@ export const account: Record<Locale, AccountCopy> = {
 			navAccountDetails: 'Данные аккаунта',
 			navStayHistory: 'История проживаний',
 			accountType: 'Тип аккаунта',
+			memberId: 'Номер гостя',
+			scanNote: 'Покажите это на ресепшене для быстрого заселения.',
 			loyaltyPoints: 'Бонусные баллы',
 			loyaltyNote: 'За каждые сутки проживания — 15 баллов. 10 баллов = 1 € — можно использовать при следующем проживании. Баллы начнут начисляться, когда заработает онлайн-бронирование.',
 			accountDetailsTitle: 'Данные аккаунта',
@@ -462,6 +571,27 @@ export const account: Record<Locale, AccountCopy> = {
 			stayHistoryEmpty: 'У вас пока нет проживаний — появится здесь, когда заработает онлайн-бронирование.',
 			logout: 'Выйти',
 			viewFullProfile: 'Открыть полный профиль',
+			editProfile: 'Редактировать профиль',
+			deleteAccount: 'Удалить мои данные',
+		},
+		editProfile: {
+			title: 'Редактировать профиль',
+			subtitle: 'Обновите свои данные ниже.',
+			submit: 'Сохранить изменения',
+			successMessage: 'Ваш профиль обновлён.',
+			backToAccount: '← Назад в кабинет',
+			errorEmailTaken: 'Аккаунт с таким email уже существует.',
+			errorGeneric: 'Что-то пошло не так. Попробуйте ещё раз.',
+		},
+		deleteAccount: {
+			title: 'Удалить мои данные',
+			warning: 'Это навсегда удалит ваш аккаунт и все данные, которые мы храним о вас, включая бонусные баллы. Это невозможно отменить.',
+			passwordLabel: 'Подтвердите пароль',
+			confirmLabel: 'Я понимаю, что это необратимо',
+			submit: 'Удалить аккаунт навсегда',
+			cancel: 'Отмена',
+			errorInvalidPassword: 'Неверный пароль.',
+			errorGeneric: 'Что-то пошло не так. Попробуйте ещё раз.',
 		},
 	},
 	lv: {
@@ -488,11 +618,14 @@ export const account: Record<Locale, AccountCopy> = {
 			companyAddress: 'Uzņēmuma adrese',
 			companyLookupNote: 'Uzņēmuma datus precizēsim ar jums tieši — automātiska meklēšana vēl nav pievienota.',
 			marketingConsent: 'Piekrītu saņemt ar rezervāciju saistītus e-pastus un reizēm — īpašos piedāvājumus.',
+			dataProcessingConsent: 'Piekrītu savu personas datu apstrādei saskaņā ar',
+			dataProcessingConsentLink: 'Privātuma politiku',
 			submit: 'Izveidot kontu',
 			haveAccount: 'Jau ir konts?',
 			loginLink: 'Ienākt',
 			errorEmailTaken: 'Konts ar šo e-pastu jau pastāv.',
 			errorPasswordMismatch: 'Paroles nesakrīt.',
+			errorConsentRequired: 'Lai turpinātu, lūdzu, piekrītiet savu personas datu apstrādei.',
 			errorGeneric: 'Kaut kas nogāja greizi. Lūdzu, mēģiniet vēlreiz.',
 		},
 		login: {
@@ -545,6 +678,8 @@ export const account: Record<Locale, AccountCopy> = {
 			navAccountDetails: 'Konta dati',
 			navStayHistory: 'Uzturēšanās vēsture',
 			accountType: 'Konta tips',
+			memberId: 'Dalībnieka ID',
+			scanNote: 'Uzrādiet to reģistratūrā ātrai reģistrēšanai.',
 			loyaltyPoints: 'Lojalitātes punkti',
 			loyaltyNote: 'Par katru uzturēšanās nakti — 15 punkti. 10 punkti = 1 € — izmantojami nākamajā uzturēšanās reizē. Punkti sāks uzkrāties, kad tiks palaista tiešsaistes rezervēšana.',
 			accountDetailsTitle: 'Konta dati',
@@ -555,6 +690,27 @@ export const account: Record<Locale, AccountCopy> = {
 			stayHistoryEmpty: 'Jums vēl nav neviena uzturēšanās — tas parādīsies, kad tiks palaista tiešsaistes rezervēšana.',
 			logout: 'Iziet',
 			viewFullProfile: 'Atvērt pilnu profilu',
+			editProfile: 'Rediģēt profilu',
+			deleteAccount: 'Dzēst manus datus',
+		},
+		editProfile: {
+			title: 'Rediģēt profilu',
+			subtitle: 'Atjauniniet savus datus zemāk.',
+			submit: 'Saglabāt izmaiņas',
+			successMessage: 'Jūsu profils ir atjaunināts.',
+			backToAccount: '← Atpakaļ uz manu kontu',
+			errorEmailTaken: 'Konts ar šo e-pastu jau pastāv.',
+			errorGeneric: 'Kaut kas nogāja greizi. Lūdzu, mēģiniet vēlreiz.',
+		},
+		deleteAccount: {
+			title: 'Dzēst manus datus',
+			warning: 'Tas neatgriezeniski dzēsīs jūsu kontu un visus mūsu glabātos datus par jums, tostarp lojalitātes punktus. To nevar atcelt.',
+			passwordLabel: 'Apstipriniet savu paroli',
+			confirmLabel: 'Es saprotu, ka to nevar atcelt',
+			submit: 'Dzēst kontu neatgriezeniski',
+			cancel: 'Atcelt',
+			errorInvalidPassword: 'Nepareiza parole.',
+			errorGeneric: 'Kaut kas nogāja greizi. Lūdzu, mēģiniet vēlreiz.',
 		},
 	},
 	fi: {
@@ -581,11 +737,14 @@ export const account: Record<Locale, AccountCopy> = {
 			companyAddress: 'Yrityksen osoite',
 			companyLookupNote: 'Vahvistamme yrityksen tiedot suoraan kanssasi — automaattinen haku ei ole vielä käytössä.',
 			marketingConsent: 'Hyväksyn varaukseen liittyvät sähköpostit ja satunnaiset tarjoukset.',
+			dataProcessingConsent: 'Hyväksyn henkilötietojeni käsittelyn',
+			dataProcessingConsentLink: 'tietosuojaselosteen mukaisesti',
 			submit: 'Luo tili',
 			haveAccount: 'Onko sinulla jo tili?',
 			loginLink: 'Kirjaudu',
 			errorEmailTaken: 'Tällä sähköpostilla on jo tili.',
 			errorPasswordMismatch: 'Salasanat eivät täsmää.',
+			errorConsentRequired: 'Jatkaaksesi hyväksy henkilötietojesi käsittely.',
 			errorGeneric: 'Jokin meni pieleen. Yritä uudelleen.',
 		},
 		login: {
@@ -638,6 +797,8 @@ export const account: Record<Locale, AccountCopy> = {
 			navAccountDetails: 'Tilin tiedot',
 			navStayHistory: 'Majoitushistoria',
 			accountType: 'Tilin tyyppi',
+			memberId: 'Jäsennumero',
+			scanNote: 'Näytä tämä vastaanotossa nopeaa sisäänkirjautumista varten.',
 			loyaltyPoints: 'Kanta-asiakaspisteet',
 			loyaltyNote: 'Jokaisesta yöstä 15 pistettä. 10 pistettä = 1 € — käytettävissä seuraavalla majoituskerralla. Pisteet alkavat kertyä, kun verkkovaraus käynnistyy.',
 			accountDetailsTitle: 'Tilin tiedot',
@@ -648,6 +809,27 @@ export const account: Record<Locale, AccountCopy> = {
 			stayHistoryEmpty: 'Sinulla ei ole vielä majoituksia — tämä täyttyy, kun verkkovaraus käynnistyy.',
 			logout: 'Kirjaudu ulos',
 			viewFullProfile: 'Avaa koko profiili',
+			editProfile: 'Muokkaa profiilia',
+			deleteAccount: 'Poista tietoni',
+		},
+		editProfile: {
+			title: 'Muokkaa profiilia',
+			subtitle: 'Päivitä tietosi alla.',
+			submit: 'Tallenna muutokset',
+			successMessage: 'Profiilisi on päivitetty.',
+			backToAccount: '← Takaisin tilille',
+			errorEmailTaken: 'Tällä sähköpostilla on jo tili.',
+			errorGeneric: 'Jokin meni pieleen. Yritä uudelleen.',
+		},
+		deleteAccount: {
+			title: 'Poista tietoni',
+			warning: 'Tämä poistaa tilisi ja kaikki sinusta tallennetut tiedot pysyvästi, mukaan lukien kanta-asiakaspisteet. Tätä ei voi perua.',
+			passwordLabel: 'Vahvista salasanasi',
+			confirmLabel: 'Ymmärrän, ettei tätä voi perua',
+			submit: 'Poista tilini pysyvästi',
+			cancel: 'Peruuta',
+			errorInvalidPassword: 'Väärä salasana.',
+			errorGeneric: 'Jokin meni pieleen. Yritä uudelleen.',
 		},
 	},
 };

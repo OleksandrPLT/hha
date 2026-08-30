@@ -38,6 +38,13 @@ export const guests = sqliteTable('guests', {
 	countryOfResidence: text('country_of_residence'),
 	marketingConsent: integer('marketing_consent', { mode: 'boolean' }).notNull().default(false),
 
+	// Згода на обробку персональних даних (GDPR) — ОБОВ'ЯЗКОВА при
+	// реєстрації (на відміну від marketingConsent, який опціональний).
+	// dataProcessingConsentAt — часова мітка для аудиту (коли саме дали
+	// згоду), окремо від createdAt на випадок майбутнього re-consent flow.
+	dataProcessingConsent: integer('data_processing_consent', { mode: 'boolean' }).notNull().default(false),
+	dataProcessingConsentAt: text('data_processing_consent_at'),
+
 	// Відновлення пароля. Email ще не підключено (немає SMTP) — посилання
 	// поки просто показуємо на екрані замість листа, див.
 	// src/pages/[locale]/account/forgot-password.astro.

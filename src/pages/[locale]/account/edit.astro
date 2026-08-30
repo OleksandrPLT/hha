@@ -1,7 +1,9 @@
 ---
-// Реальний SSR (немає prerender) — вимагає працюючого Node-процесу
-// (PM2 на Zone.ee, див. пам'ять hha-hosting-infra). Локально в dev-режимі
-// працює одразу.
+// Редагування профілю — та сама "максимальна анкета", що й реєстрація,
+// мінус пароль (для зміни пароля є окремий forgot-password flow) і мінус
+// dataProcessingConsent (згода дається один раз при реєстрації, тут її не
+// перепідтверджують — GDPR не вимагає re-consent на кожне редагування,
+// тільки чіткий шлях відкликання, для чого є delete.astro).
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import SiteHeader from '../../../components/SiteHeader.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
@@ -11,22 +13,56 @@ import { account } from '../../../i18n/account';
 import { countries } from '../../../data/countries';
 import { db } from '../../../db/client';
 import { guests } from '../../../db/schema';
-import { hashPassword, isValidEmail } from '../../../lib/auth';
-import { eq } from 'drizzle-orm';
+import { isValidEmail } from '../../../lib/auth';
+import { eq, and, ne } from 'drizzle-orm';
 
 const rawLocale = Astro.params.locale;
 if (!rawLocale || !isLocale(rawLocale)) {
-	return Astro.redirect(`/${defaultLocale}/account/register`);
+	return Astro.redirect(`/${defaultLocale}/account/edit`);
 }
 const locale: Locale = rawLocale;
-const copy = account[locale].register;
+const copy = account[locale].editProfile;
+const regCopy = account[locale].register;
+
+const guestId = await Astro.session?.get('guestId');
+if (!guestId) {
+	return Astro.redirect(`/${locale}/account/login`);
+}
+
+const guest = db.select().from(guests).where(eq(guests.id, guestId)).get();
+if (!guest) {
+	return Astro.redirect(`/${locale}/account/login`);
+}
 
 let error = '';
-let values: Record<string, string> = {};
+let success = false;
+
+// Значення полів форми — з guest за замовчуванням, перебиваються values
+// POST-даними, якщо була спроба сабміту з помилкою (щоб не втрачати те,
+// що гість щойно ввів).
+let values: Record<string, string> = {
+	accountType: guest.isCompany ? 'company' : 'individual',
+	fullName: guest.fullName,
+	email: guest.email,
+	phone_country: guest.phone.split(' ')[0] ?? '',
+	phone: guest.phone.split(' ').slice(1).join(' '),
+	nationality: guest.nationality ?? '',
+	dateOfBirth: guest.dateOfBirth ?? '',
+	address: guest.addressLine ?? '',
+	city: guest.city ?? '',
+	postalCode: guest.postalCode ?? '',
+	countryOfResidence: guest.countryOfResidence ?? '',
+	companyName: guest.companyName ?? '',
+	companyRegCode: guest.companyRegCode ?? '',
+	companyVat: guest.companyVat ?? '',
+	companyAddress: guest.companyAddress ?? '',
+	marketingConsent: guest.marketingConsent ? 'on' : '',
+};
 
 if (Astro.request.method === 'POST') {
 	const form = await Astro.request.formData();
-	values = Object.fromEntries([...form.entries()].map(([k, v]) => [k, String(v)]));
+	const posted = Object.fromEntries([...form.entries()].map(([k, v]) => [k, String(v)]));
+	values = { ...values, ...posted, marketingConsent: form.get('marketingConsent') === 'on' ? 'on' : '' };
 
 	const isCompany = form.get('accountType') === 'company';
 	const fullName = String(form.get('fullName') || '').trim();
@@ -35,30 +71,23 @@ if (Astro.request.method === 'POST') {
 		.toLowerCase();
 	const phoneCountry = String(form.get('phone_country') || '');
 	const phoneNumber = String(form.get('phone') || '').trim();
-	const password = String(form.get('password') || '');
-	const confirmPassword = String(form.get('confirmPassword') || '');
 
-	const dataProcessingConsent = form.get('dataProcessingConsent') === 'on';
-
-	if (!fullName || !isValidEmail(email) || !phoneNumber || !password) {
+	if (!fullName || !isValidEmail(email) || !phoneNumber) {
 		error = copy.errorGeneric;
-	} else if (password !== confirmPassword) {
-		error = copy.errorPasswordMismatch;
-	} else if (!dataProcessingConsent) {
-		error = copy.errorConsentRequired;
 	} else {
-		const existing = db.select().from(guests).where(eq(guests.email, email)).get();
+		const existing = db
+			.select()
+			.from(guests)
+			.where(and(eq(guests.email, email), ne(guests.id, guestId)))
+			.get();
 		if (existing) {
 			error = copy.errorEmailTaken;
 		} else {
-			const passwordHash = await hashPassword(password);
-			const inserted = db
-				.insert(guests)
-				.values({
+			db.update(guests)
+				.set({
 					fullName,
 					email,
 					phone: `${phoneCountry} ${phoneNumber}`,
-					passwordHash,
 					isCompany,
 					companyName: isCompany ? String(form.get('companyName') || '') || null : null,
 					companyRegCode: isCompany ? String(form.get('companyRegCode') || '') || null : null,
@@ -71,145 +100,111 @@ if (Astro.request.method === 'POST') {
 					postalCode: String(form.get('postalCode') || '') || null,
 					countryOfResidence: String(form.get('countryOfResidence') || '') || null,
 					marketingConsent: form.get('marketingConsent') === 'on',
-					dataProcessingConsent: true,
-					dataProcessingConsentAt: new Date().toISOString(),
 				})
+				.where(eq(guests.id, guestId))
 				.run();
 
-			await Astro.session?.set('guestId', Number(inserted.lastInsertRowid));
-			Astro.cookies.set('hha_signed_in', '1', { path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 30 });
-			return Astro.redirect(`/${locale}/account`);
+			success = true;
 		}
 	}
 }
 ---
 
-<BaseLayout locale={locale} title={`${copy.title} — Hostel & Hotel Apartments`} description={copy.subtitle} path="/account/register">
+<BaseLayout locale={locale} title={`${copy.title} — Hostel & Hotel Apartments`} description={copy.subtitle} path="/account/edit">
 	<SiteHeader locale={locale} />
 
 	<main class="modal-page">
-		<a class="modal-page__scrim" href={`/${locale}`} aria-label="Close"></a>
+		<a class="modal-page__scrim" href={`/${locale}/account`} aria-label="Close"></a>
 		<div class="modal-page__card">
-			<a class="modal-page__close" href={`/${locale}`} aria-label="Close">
+			<a class="modal-page__close" href={`/${locale}/account`} aria-label="Close">
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
 			</a>
 
 			<h1>{copy.title}</h1>
 			<p class="subtitle">{copy.subtitle}</p>
 
-			<div class="oauth-buttons">
-				<button type="button" class="oauth-btn" disabled title="Coming soon">
-					<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-						<path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" />
-						<path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" />
-						<path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" />
-						<path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" />
-					</svg>
-					Google
-				</button>
-				<button type="button" class="oauth-btn" disabled title="Coming soon">
-					<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-						<circle cx="12" cy="12" r="12" fill="#26A5E4" />
-						<path fill="#fff" d="M5.4 12.1l12-4.6c.6-.2 1.1.3.9 1l-2 9.3c-.1.5-.7.7-1.1.4l-3.1-2.3-1.5 1.4c-.2.2-.4.2-.6.1l.3-2.7 5.5-5-6.9 4.3-2.8-.9c-.6-.2-.6-.6.3-1z" />
-					</svg>
-					Telegram
-				</button>
-			</div>
-			<p class="oauth-note">Coming soon</p>
-			<div class="or-divider"><span>—</span></div>
-
+			{success && <p class="form-success">{copy.successMessage}</p>}
 			{error && <p class="form-error">{error}</p>}
 
-			<form method="POST" class="account-form" id="register-form">
+			<form method="POST" class="account-form" id="edit-form">
 				<div class="account-type-toggle">
 					<label>
 						<input type="radio" name="accountType" value="individual" checked={values.accountType !== 'company'} />
-						{copy.accountTypeIndividual}
+						{regCopy.accountTypeIndividual}
 					</label>
 					<label>
 						<input type="radio" name="accountType" value="company" checked={values.accountType === 'company'} />
-						{copy.accountTypeCompany}
+						{regCopy.accountTypeCompany}
 					</label>
 				</div>
 
 				<div class="company-fields" id="company-fields" hidden>
 					<label>
-						{copy.companyName}
+						{regCopy.companyName}
 						<input type="text" name="companyName" value={values.companyName ?? ''} />
 					</label>
 					<label>
-						{copy.companyRegCode}
+						{regCopy.companyRegCode}
 						<input type="text" name="companyRegCode" value={values.companyRegCode ?? ''} />
 					</label>
 					<label>
-						{copy.companyVat}
+						{regCopy.companyVat}
 						<input type="text" name="companyVat" value={values.companyVat ?? ''} />
 					</label>
 					<label>
-						{copy.companyAddress}
+						{regCopy.companyAddress}
 						<input type="text" name="companyAddress" value={values.companyAddress ?? ''} />
 					</label>
-					<p class="field-note">{copy.companyLookupNote}</p>
+					<p class="field-note">{regCopy.companyLookupNote}</p>
 				</div>
 
 				<label>
-					{copy.fullName}
+					{regCopy.fullName}
 					<input type="text" name="fullName" required value={values.fullName ?? ''} />
 				</label>
 
 				<label>
-					{copy.email}
+					{regCopy.email}
 					<input type="email" name="email" required value={values.email ?? ''} />
 				</label>
 
 				<label>
-					{copy.phone}
+					{regCopy.phone}
 					<PhoneInput name="phone" required value={values.phone} countryValue={values.phone_country} />
 				</label>
 
 				<div class="field-row">
 					<label>
-						{copy.password}
-						<input type="password" name="password" required minlength="8" />
-					</label>
-					<label>
-						{copy.confirmPassword}
-						<input type="password" name="confirmPassword" required minlength="8" />
-					</label>
-				</div>
-
-				<div class="field-row">
-					<label>
-						{copy.nationality}
+						{regCopy.nationality}
 						<select name="nationality">
 							<option value="">—</option>
 							{countries.map((c) => <option value={c.iso2} selected={values.nationality === c.iso2}>{c.name}</option>)}
 						</select>
 					</label>
 					<label>
-						{copy.dateOfBirth}
+						{regCopy.dateOfBirth}
 						<input type="date" name="dateOfBirth" value={values.dateOfBirth ?? ''} />
 					</label>
 				</div>
 
 				<label>
-					{copy.address}
+					{regCopy.address}
 					<input type="text" name="address" value={values.address ?? ''} />
 				</label>
 
 				<div class="field-row">
 					<label>
-						{copy.city}
+						{regCopy.city}
 						<input type="text" name="city" value={values.city ?? ''} />
 					</label>
 					<label>
-						{copy.postalCode}
+						{regCopy.postalCode}
 						<input type="text" name="postalCode" value={values.postalCode ?? ''} />
 					</label>
 				</div>
 
 				<label>
-					{copy.countryOfResidence}
+					{regCopy.countryOfResidence}
 					<select name="countryOfResidence">
 						<option value="">—</option>
 						{countries.map((c) => <option value={c.iso2} selected={values.countryOfResidence === c.iso2}>{c.name}</option>)}
@@ -217,22 +212,14 @@ if (Astro.request.method === 'POST') {
 				</label>
 
 				<label class="checkbox-row">
-					<input type="checkbox" name="dataProcessingConsent" required checked={values.dataProcessingConsent === 'on'} />
-					<span>
-						{copy.dataProcessingConsent}{' '}
-						<a href={`/${locale}/privacy`} target="_blank" rel="noopener noreferrer">{copy.dataProcessingConsentLink}</a>
-					</span>
-				</label>
-
-				<label class="checkbox-row">
 					<input type="checkbox" name="marketingConsent" checked={values.marketingConsent === 'on'} />
-					{copy.marketingConsent}
+					{regCopy.marketingConsent}
 				</label>
 
 				<button type="submit" class="btn btn--primary-dark">{copy.submit}</button>
 
 				<p class="form-footnote">
-					{copy.haveAccount} <a href={`/${locale}/account/login`}>{copy.loginLink}</a>
+					<a href={`/${locale}/account`}>{copy.backToAccount}</a>
 				</p>
 			</form>
 		</div>
@@ -318,8 +305,9 @@ if (Astro.request.method === 'POST') {
 
 		h1 {
 			margin: 0 0 0.4rem;
+			font-family: var(--font-display);
 			font-size: clamp(1.3rem, 4vw, 1.6rem);
-			font-weight: 800;
+			font-weight: 600;
 			padding-right: 1.75rem;
 		}
 
@@ -333,6 +321,16 @@ if (Astro.request.method === 'POST') {
 			background: rgba(234, 67, 53, 0.1);
 			color: #c0392b;
 			border: 1px solid rgba(234, 67, 53, 0.3);
+			border-radius: 0.6rem;
+			padding: 0.75rem 1rem;
+			margin-bottom: 1.25rem;
+			font-size: 0.9rem;
+		}
+
+		.form-success {
+			background: rgba(63, 122, 79, 0.1);
+			color: #3f7a4f;
+			border: 1px solid rgba(63, 122, 79, 0.3);
 			border-radius: 0.6rem;
 			padding: 0.75rem 1rem;
 			margin-bottom: 1.25rem;
@@ -356,7 +354,6 @@ if (Astro.request.method === 'POST') {
 
 		.account-form input[type='text'],
 		.account-form input[type='email'],
-		.account-form input[type='password'],
 		.account-form input[type='date'],
 		.account-form select {
 			font: inherit;
@@ -390,9 +387,6 @@ if (Astro.request.method === 'POST') {
 			font-weight: 600;
 		}
 
-		/* :not([hidden]) — інакше та ж помилка, що з LanguageModal: наше
-		   display:flex перебиває UA-правило [hidden]{display:none} через
-		   однакову специфічність і порядок джерел. */
 		.company-fields:not([hidden]) {
 			display: flex;
 			flex-direction: column;
@@ -423,20 +417,20 @@ if (Astro.request.method === 'POST') {
 			margin-top: 0.2rem;
 		}
 
-		.checkbox-row a {
-			color: var(--accent);
-			font-weight: 600;
-		}
-
 		.form-footnote {
 			margin: 0.25rem 0 0;
+			text-align: center;
 			font-size: 0.85rem;
-			color: var(--text-dark-muted);
 		}
 
 		.form-footnote a {
 			color: var(--accent);
 			font-weight: 600;
+			text-decoration: none;
+		}
+
+		.form-footnote a:hover {
+			text-decoration: underline;
 		}
 
 		@media (max-width: 560px) {

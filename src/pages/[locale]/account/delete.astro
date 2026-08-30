@@ -1,0 +1,237 @@
+---
+// Видалення акаунту (GDPR "право на забуття"). Вимагає повторного вводу
+// пароля — це навмисне тертя для такої незворотної дії, не помилка UX.
+// Реального видалення "слідів" з БД (WAL/бекапи) це не гарантує саме по
+// собі, але сама сесія/рядок гостя видаляються остаточно.
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import SiteHeader from '../../../components/SiteHeader.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import { isLocale, defaultLocale, type Locale } from '../../../i18n/locales';
+import { account } from '../../../i18n/account';
+import { db } from '../../../db/client';
+import { guests } from '../../../db/schema';
+import { verifyPassword } from '../../../lib/auth';
+import { eq } from 'drizzle-orm';
+
+const rawLocale = Astro.params.locale;
+if (!rawLocale || !isLocale(rawLocale)) {
+	return Astro.redirect(`/${defaultLocale}/account/delete`);
+}
+const locale: Locale = rawLocale;
+const copy = account[locale].deleteAccount;
+
+const guestId = await Astro.session?.get('guestId');
+if (!guestId) {
+	return Astro.redirect(`/${locale}/account/login`);
+}
+
+const guest = db.select().from(guests).where(eq(guests.id, guestId)).get();
+if (!guest) {
+	return Astro.redirect(`/${locale}/account/login`);
+}
+
+let error = '';
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	const password = String(form.get('password') || '');
+	const confirmed = form.get('confirmed') === 'on';
+
+	if (!confirmed || !password) {
+		error = copy.errorGeneric;
+	} else if (!(await verifyPassword(password, guest.passwordHash))) {
+		error = copy.errorInvalidPassword;
+	} else {
+		db.delete(guests).where(eq(guests.id, guestId)).run();
+		await Astro.session?.destroy();
+		Astro.cookies.delete('hha_signed_in', { path: '/' });
+		return Astro.redirect(`/${locale}`);
+	}
+}
+---
+
+<BaseLayout locale={locale} title={`${copy.title} — Hostel & Hotel Apartments`} description={copy.title} path="/account/delete">
+	<SiteHeader locale={locale} />
+
+	<main class="modal-page">
+		<a class="modal-page__scrim" href={`/${locale}/account`} aria-label="Close"></a>
+		<div class="modal-page__card">
+			<a class="modal-page__close" href={`/${locale}/account`} aria-label="Close">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+			</a>
+
+			<h1>{copy.title}</h1>
+			<p class="warning">{copy.warning}</p>
+
+			{error && <p class="form-error">{error}</p>}
+
+			<form method="POST" class="account-form">
+				<label>
+					{copy.passwordLabel}
+					<input type="password" name="password" required />
+				</label>
+
+				<label class="checkbox-row">
+					<input type="checkbox" name="confirmed" required />
+					{copy.confirmLabel}
+				</label>
+
+				<button type="submit" class="btn btn--danger">{copy.submit}</button>
+				<a class="cancel-link" href={`/${locale}/account`}>{copy.cancel}</a>
+			</form>
+		</div>
+	</main>
+
+	<SiteFooter locale={locale} />
+
+	<style>
+		.modal-page {
+			position: relative;
+			display: flex;
+			align-items: flex-start;
+			justify-content: center;
+			padding: 3.5rem 1.25rem 4rem;
+			background: var(--bg-light);
+		}
+
+		.modal-page__scrim {
+			position: absolute;
+			inset: 0;
+			background: transparent;
+		}
+
+		.modal-page__card {
+			position: relative;
+			width: 100%;
+			max-width: 24rem;
+			background: #fff;
+			color: var(--text-dark);
+			border-radius: 1rem;
+			padding: 1.75rem 1.5rem;
+			border: 1px solid var(--border-light);
+			box-shadow: 0 24px 60px rgba(20, 22, 26, 0.16);
+			animation: modal-pop 0.16s ease;
+		}
+
+		@keyframes modal-pop {
+			from {
+				opacity: 0;
+				transform: translateY(10px) scale(0.97);
+			}
+			to {
+				opacity: 1;
+				transform: translateY(0) scale(1);
+			}
+		}
+
+		.modal-page__close {
+			position: absolute;
+			top: 0.9rem;
+			right: 0.9rem;
+			width: 2.1rem;
+			height: 2.1rem;
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: var(--text-dark-muted);
+			text-decoration: none;
+		}
+
+		.modal-page__close:hover {
+			background: rgba(0, 0, 0, 0.06);
+			color: var(--text-dark);
+		}
+
+		h1 {
+			margin: 0 0 0.8rem;
+			font-family: var(--font-display);
+			font-size: clamp(1.3rem, 4vw, 1.6rem);
+			font-weight: 600;
+			padding-right: 1.75rem;
+			color: #b3432f;
+		}
+
+		.warning {
+			margin: 0 0 1.4rem;
+			font-size: 0.85rem;
+			line-height: 1.55;
+			color: var(--text-dark-muted);
+		}
+
+		.form-error {
+			background: rgba(234, 67, 53, 0.1);
+			color: #c0392b;
+			border: 1px solid rgba(234, 67, 53, 0.3);
+			border-radius: 0.6rem;
+			padding: 0.75rem 1rem;
+			margin-bottom: 1.25rem;
+			font-size: 0.9rem;
+		}
+
+		.account-form {
+			display: flex;
+			flex-direction: column;
+			gap: 1.1rem;
+		}
+
+		.account-form label {
+			display: flex;
+			flex-direction: column;
+			gap: 0.35rem;
+			font-size: 0.85rem;
+			font-weight: 600;
+			color: var(--text-dark);
+		}
+
+		.account-form input[type='password'] {
+			font: inherit;
+			font-weight: 400;
+			padding: 0.6rem 0.75rem;
+			border-radius: 0.5rem;
+			border: 1px solid var(--border-light);
+			background: #fff;
+			color: var(--text-dark);
+		}
+
+		.checkbox-row {
+			flex-direction: row;
+			align-items: flex-start;
+			gap: 0.5rem;
+			font-weight: 400;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+		}
+
+		.checkbox-row input {
+			margin-top: 0.2rem;
+		}
+
+		.btn--danger {
+			height: 2.8rem;
+			border: none;
+			border-radius: 0.6rem;
+			background: #b3432f;
+			color: #fff;
+			font-size: 0.88rem;
+			font-weight: 700;
+			cursor: pointer;
+		}
+
+		.btn--danger:hover {
+			background: #96361f;
+		}
+
+		.cancel-link {
+			text-align: center;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+			text-decoration: none;
+		}
+
+		.cancel-link:hover {
+			color: var(--text-dark);
+			text-decoration: underline;
+		}
+	</style>
+</BaseLayout>
