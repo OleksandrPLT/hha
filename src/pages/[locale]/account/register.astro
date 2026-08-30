@@ -14,6 +14,7 @@ import { guests } from '../../../db/schema';
 import { hashPassword, isValidEmail, generateResetToken } from '../../../lib/auth';
 import { formatMemberId } from '../../../lib/memberCard';
 import { isGoogleOAuthConfigured, fetchAndEncodeAvatar } from '../../../lib/oauth';
+import { isTelegramConfigured, telegramBotUsername } from '../../../lib/telegram';
 import { eq } from 'drizzle-orm';
 
 const rawLocale = Astro.params.locale;
@@ -23,19 +24,30 @@ if (!rawLocale || !isLocale(rawLocale)) {
 const locale: Locale = rawLocale;
 const copy = account[locale].register;
 const googleReady = isGoogleOAuthConfigured();
+const telegramReady = isTelegramConfigured();
 
-// Продовження реєстрації після Google OAuth (callback.ts кладе профіль у
-// сесію, коли це геть новий гість — Google не дає телефон і не заміняє
-// нашу обов'язкову згоду на обробку даних, тож анкету все одно треба
-// заповнити, лише без пароля).
+// Продовження реєстрації після Google/Telegram OAuth (callback кладе
+// профіль у сесію, коли це геть новий гість — жоден з провайдерів не дає
+// телефон і не заміняє нашу обов'язкову згоду на обробку даних, тож
+// анкету все одно треба заповнити, лише без пароля). Google дає email
+// одразу (лишається readonly); Telegram email не дає взагалі — гість
+// вписує свій сам, як завжди.
 const pendingGoogle = (await Astro.session?.get('pendingGoogle')) as { sub: string; email: string; name: string; picture: string } | undefined;
-// Достатньо самого факту наявності pendingGoogle в сесії (не query-рядка
-// ?google=1) — так branching працює однаково і на GET, і на POST,
-// незалежно від того, чи форма зберігає query string при сабміті.
+const pendingTelegram = (await Astro.session?.get('pendingTelegram')) as { id: string; name: string; photoUrl: string } | undefined;
+// Достатньо самого факту наявності pendingGoogle/pendingTelegram в сесії
+// (не query-рядка ?google=1/?telegram=1) — так branching працює однаково
+// і на GET, і на POST, незалежно від того, чи форма зберігає query string
+// при сабміті.
 const googleMode = Boolean(pendingGoogle);
+const telegramMode = !googleMode && Boolean(pendingTelegram);
+const oauthMode = googleMode || telegramMode;
 
 let error = '';
-let values: Record<string, string> = googleMode && pendingGoogle ? { fullName: pendingGoogle.name, email: pendingGoogle.email } : {};
+let values: Record<string, string> = googleMode && pendingGoogle
+	? { fullName: pendingGoogle.name, email: pendingGoogle.email }
+	: telegramMode && pendingTelegram
+		? { fullName: pendingTelegram.name }
+		: {};
 
 if (Astro.request.method === 'POST') {
 	const form = await Astro.request.formData();
@@ -53,10 +65,10 @@ if (Astro.request.method === 'POST') {
 
 	const dataProcessingConsent = form.get('dataProcessingConsent') === 'on';
 
-	const passwordOk = googleMode || (password.length > 0 && password === confirmPassword);
+	const passwordOk = oauthMode || (password.length > 0 && password === confirmPassword);
 
 	if (!fullName || !isValidEmail(email) || !phoneNumber || !passwordOk) {
-		error = !passwordOk && !googleMode && password !== confirmPassword ? copy.errorPasswordMismatch : copy.errorGeneric;
+		error = !passwordOk && !oauthMode && password !== confirmPassword ? copy.errorPasswordMismatch : copy.errorGeneric;
 	} else if (!dataProcessingConsent) {
 		error = copy.errorConsentRequired;
 	} else {
@@ -64,11 +76,13 @@ if (Astro.request.method === 'POST') {
 		if (existing) {
 			error = copy.errorEmailTaken;
 		} else {
-			// Google-гість не задає пароль — генеруємо випадковий, невідомий
-			// йому самому (bcrypt-хеш все одно потрібен, поле NOT NULL). Якщо
-			// колись захоче логінитись паролем — forgot-password це вирішує.
-			const passwordHash = await hashPassword(googleMode ? generateResetToken() : password);
-			const avatarUrl = googleMode && pendingGoogle?.picture ? await fetchAndEncodeAvatar(pendingGoogle.picture) : null;
+			// Google/Telegram-гість не задає пароль — генеруємо випадковий,
+			// невідомий йому самому (bcrypt-хеш все одно потрібен, поле NOT
+			// NULL). Якщо колись захоче логінитись паролем — forgot-password
+			// це вирішує.
+			const passwordHash = await hashPassword(oauthMode ? generateResetToken() : password);
+			const avatarSourceUrl = googleMode ? pendingGoogle?.picture : telegramMode ? pendingTelegram?.photoUrl : null;
+			const avatarUrl = avatarSourceUrl ? await fetchAndEncodeAvatar(avatarSourceUrl) : null;
 
 			const inserted = db
 				.insert(guests)
@@ -92,12 +106,14 @@ if (Astro.request.method === 'POST') {
 					dataProcessingConsent: true,
 					dataProcessingConsentAt: new Date().toISOString(),
 					googleId: googleMode ? pendingGoogle?.sub : null,
+					telegramId: telegramMode ? pendingTelegram?.id : null,
 					avatarUrl: avatarUrl,
-					avatarSource: avatarUrl ? 'google' : null,
+					avatarSource: avatarUrl ? (googleMode ? 'google' : 'telegram') : null,
 				})
 				.run();
 
 			if (googleMode) await Astro.session?.set('pendingGoogle', undefined);
+			if (telegramMode) await Astro.session?.set('pendingTelegram', undefined);
 			await Astro.session?.set('guestId', Number(inserted.lastInsertRowid));
 			Astro.cookies.set('hha_signed_in', '1', { path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 30 });
 			return Astro.redirect(`/${locale}/account/${formatMemberId(Number(inserted.lastInsertRowid))}`);
@@ -120,7 +136,7 @@ if (Astro.request.method === 'POST') {
 			<p class="subtitle">{copy.subtitle}</p>
 
 			{
-				!googleMode && (
+				!oauthMode && (
 					<Fragment>
 						<div class="oauth-buttons">
 							{googleReady ? (
@@ -144,15 +160,18 @@ if (Astro.request.method === 'POST') {
 									Google
 								</button>
 							)}
-							<button type="button" class="oauth-btn" disabled title="Coming soon">
-								<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-									<circle cx="12" cy="12" r="12" fill="#26A5E4" />
-									<path fill="#fff" d="M5.4 12.1l12-4.6c.6-.2 1.1.3.9 1l-2 9.3c-.1.5-.7.7-1.1.4l-3.1-2.3-1.5 1.4c-.2.2-.4.2-.6.1l.3-2.7 5.5-5-6.9 4.3-2.8-.9c-.6-.2-.6-.6.3-1z" />
-								</svg>
-								Telegram
-							</button>
+							{telegramReady ? (
+								<div class="telegram-widget-slot" id="telegram-widget-slot" data-bot-username={telegramBotUsername()} data-auth-url={`https://hha.ee/api/oauth/telegram/callback?locale=${locale}`} />
+							) : (
+								<button type="button" class="oauth-btn" disabled title="Coming soon">
+									<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+										<circle cx="12" cy="12" r="12" fill="#26A5E4" />
+										<path fill="#fff" d="M5.4 12.1l12-4.6c.6-.2 1.1.3.9 1l-2 9.3c-.1.5-.7.7-1.1.4l-3.1-2.3-1.5 1.4c-.2.2-.4.2-.6.1l.3-2.7 5.5-5-6.9 4.3-2.8-.9c-.6-.2-.6-.6.3-1z" />
+									</svg>
+									Telegram
+								</button>
+							)}
 						</div>
-						<p class="oauth-note">Telegram — Coming soon</p>
 						<div class="or-divider"><span>—</span></div>
 					</Fragment>
 				)
@@ -168,6 +187,17 @@ if (Astro.request.method === 'POST') {
 							<path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" />
 						</svg>
 						Continuing as {pendingGoogle.email} — just a few more details.
+					</p>
+				)
+			}
+			{
+				telegramMode && pendingTelegram && (
+					<p class="google-mode-note">
+						<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+							<circle cx="12" cy="12" r="12" fill="#26A5E4" />
+							<path fill="#fff" d="M5.4 12.1l12-4.6c.6-.2 1.1.3.9 1l-2 9.3c-.1.5-.7.7-1.1.4l-3.1-2.3-1.5 1.4c-.2.2-.4.2-.6.1l.3-2.7 5.5-5-6.9 4.3-2.8-.9c-.6-.2-.6-.6.3-1z" />
+						</svg>
+						Continuing as {pendingTelegram.name} via Telegram — just a few more details.
 					</p>
 				)
 			}
@@ -222,7 +252,7 @@ if (Astro.request.method === 'POST') {
 				</label>
 
 				{
-					!googleMode && (
+					!oauthMode && (
 						<div class="field-row">
 							<label>
 								{copy.password}
@@ -310,6 +340,24 @@ if (Astro.request.method === 'POST') {
 				r.addEventListener('change', sync);
 			});
 			sync();
+		})();
+
+		// Telegram Login Widget — не рендериться напряму в шаблоні, бо це
+		// сторонній <script>, який САМ малює свою кнопку/iframe. Читаємо
+		// налаштування зі слота (data-bot-username/data-auth-url) і вставляємо
+		// офіційний скрипт telegram.org програмно.
+		(function () {
+			var slot = document.getElementById('telegram-widget-slot');
+			if (!slot) return;
+			var s = document.createElement('script');
+			s.async = true;
+			s.src = 'https://telegram.org/js/telegram-widget.js?22';
+			s.setAttribute('data-telegram-login', slot.dataset.botUsername);
+			s.setAttribute('data-size', 'large');
+			s.setAttribute('data-radius', '8');
+			s.setAttribute('data-auth-url', slot.dataset.authUrl);
+			s.setAttribute('data-request-access', 'write');
+			slot.appendChild(s);
 		})();
 	</script>
 
@@ -432,6 +480,13 @@ if (Astro.request.method === 'POST') {
 
 		.oauth-btn[disabled]:hover {
 			border-color: var(--border-light);
+		}
+
+		.telegram-widget-slot {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			min-height: 42px;
 		}
 
 		.oauth-note {

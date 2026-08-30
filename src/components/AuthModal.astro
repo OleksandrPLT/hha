@@ -9,6 +9,7 @@
 import type { Locale } from '../i18n/locales';
 import { account } from '../i18n/account';
 import { isGoogleOAuthConfigured } from '../lib/oauth';
+import { isTelegramConfigured, telegramBotUsername } from '../lib/telegram';
 import Logo from './Logo.astro';
 
 interface Props {
@@ -20,6 +21,7 @@ const copy = account[locale].login;
 const regCopy = account[locale].register;
 const am = account[locale].authModal;
 const googleReady = isGoogleOAuthConfigured();
+const telegramReady = isTelegramConfigured();
 ---
 
 <div class="auth-modal" id="auth-modal" hidden>
@@ -76,15 +78,19 @@ const googleReady = isGoogleOAuthConfigured();
 						Google
 					</button>
 				)}
-				<button type="button" class="social-btn" disabled title={am.comingSoon}>
-					<svg viewBox="0 0 240 240">
-						<circle cx="120" cy="120" r="120" fill="#29A9EA" />
-						<path fill="#fff" d="M52 118l128-49c6-2 11 1 9 10l-22 103c-2 8-7 10-14 6l-38-28-18 17c-2 2-4 4-8 4l3-40 73-66c3-3-1-4-4-2l-90 57-39-12c-8-3-8-9 2-10z" />
-					</svg>
-					Telegram
-				</button>
+				{telegramReady ? (
+					<div class="telegram-widget-slot" id="telegram-widget-slot" data-bot-username={telegramBotUsername()} data-auth-url={`https://hha.ee/api/oauth/telegram/callback?locale=${locale}`} />
+				) : (
+					<button type="button" class="social-btn" disabled title={am.comingSoon}>
+						<svg viewBox="0 0 240 240">
+							<circle cx="120" cy="120" r="120" fill="#29A9EA" />
+							<path fill="#fff" d="M52 118l128-49c6-2 11 1 9 10l-22 103c-2 8-7 10-14 6l-38-28-18 17c-2 2-4 4-8 4l3-40 73-66c3-3-1-4-4-2l-90 57-39-12c-8-3-8-9 2-10z" />
+						</svg>
+						Telegram
+					</button>
+				)}
 			</div>
-			<p class="oauth-note">{am.oauthNote}</p>
+			{!googleReady && !telegramReady && <p class="oauth-note">{am.oauthNote}</p>}
 
 			<div class="divider"><span>{am.orByEmail}</span></div>
 
@@ -148,9 +154,29 @@ const googleReady = isGoogleOAuthConfigured();
 			});
 		}
 
+		var telegramWidgetLoaded = false;
+		function loadTelegramWidget() {
+			if (telegramWidgetLoaded) return;
+			var slot = document.getElementById('telegram-widget-slot');
+			if (!slot) return;
+			telegramWidgetLoaded = true;
+			var s = document.createElement('script');
+			s.async = true;
+			s.src = 'https://telegram.org/js/telegram-widget.js?22';
+			s.setAttribute('data-telegram-login', slot.dataset.botUsername);
+			s.setAttribute('data-size', 'large');
+			s.setAttribute('data-radius', '8');
+			s.setAttribute('data-auth-url', slot.dataset.authUrl);
+			s.setAttribute('data-request-access', 'write');
+			slot.appendChild(s);
+		}
+
 		function open() {
 			modal.hidden = false;
 			document.body.style.overflow = 'hidden';
+			// Ліниво, тільки коли попап реально відкрили — не тягнемо сторонній
+			// скрипт Telegram на кожній сторінці сайту заздалегідь.
+			loadTelegramWidget();
 		}
 
 		function close() {
@@ -418,6 +444,13 @@ const googleReady = isGoogleOAuthConfigured();
 
 	.social-btn[disabled]:hover {
 		border-color: var(--border-light);
+	}
+
+	.telegram-widget-slot {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 42px;
 	}
 
 	.social-btn svg {
