@@ -41,6 +41,21 @@ export interface AccountCopy {
 		errorInvalid: string;
 		forgotPassword: string;
 	};
+	authModal: {
+		close: string;
+		loyaltyBadge: string;
+		brandHeading: string;
+		brandBody: string;
+		secureConnection: string;
+		comingSoon: string;
+		orByEmail: string;
+		oauthNote: string;
+		subtitle: string;
+		emailPlaceholder: string;
+		showPassword: string;
+		hidePassword: string;
+		rememberMe: string;
+	};
 	forgotPassword: { title: string; subtitle: string; email: string; submit: string; successMessage: string; backToLogin: string };
 	resetPassword: {
 		title: string;
@@ -117,6 +132,21 @@ export const account: Record<Locale, AccountCopy> = {
 			registerLink: 'Create one',
 			errorInvalid: 'Incorrect email or password.',
 			forgotPassword: 'Forgot password?',
+		},
+		authModal: {
+			close: 'Close',
+			loyaltyBadge: '15 pts / night · 10 pts = €1',
+			brandHeading: 'Sign in for your loyalty points',
+			brandBody: 'See your points balance, book faster next time, and keep your details on file. Your data stays private.',
+			secureConnection: 'Secure connection',
+			comingSoon: 'Coming soon',
+			orByEmail: 'or by email',
+			oauthNote: 'Google & Telegram sign-in — coming soon',
+			subtitle: "Welcome back — choose how you'd like to sign in.",
+			emailPlaceholder: 'you@example.com',
+			showPassword: 'Show password',
+			hidePassword: 'Hide password',
+			rememberMe: 'Remember me',
 		},
 		forgotPassword: {
 			title: 'Reset password',
@@ -196,6 +226,21 @@ export const account: Record<Locale, AccountCopy> = {
 			errorInvalid: 'Vale e-post või parool.',
 			forgotPassword: 'Unustasid parooli?',
 		},
+		authModal: {
+			close: 'Sulge',
+			loyaltyBadge: '15 p / öö · 10 p = 1 €',
+			brandHeading: 'Logi sisse oma lojaalsuspunktide jaoks',
+			brandBody: 'Vaata oma punktiseisu, broneeri kiiremini järgmisel korral ja hoia oma andmed salvestatuna. Sinu andmed jäävad privaatseks.',
+			secureConnection: 'Turvaline ühendus',
+			comingSoon: 'Tulekul',
+			orByEmail: 'või e-postiga',
+			oauthNote: 'Google ja Telegrami sisselogimine — tulekul',
+			subtitle: 'Tere tulemast tagasi — vali, kuidas soovid sisse logida.',
+			emailPlaceholder: 'sina@naide.ee',
+			showPassword: 'Näita parooli',
+			hidePassword: 'Peida parool',
+			rememberMe: 'Jäta mind meelde',
+		},
 		forgotPassword: {
 			title: 'Lähtesta parool',
 			subtitle: 'Sisesta oma e-post ja saadame sulle lähtestamislingi.',
@@ -273,6 +318,21 @@ export const account: Record<Locale, AccountCopy> = {
 			registerLink: 'Створити',
 			errorInvalid: 'Невірний email або пароль.',
 			forgotPassword: 'Забули пароль?',
+		},
+		authModal: {
+			close: 'Закрити',
+			loyaltyBadge: '15 балів / ніч · 10 балів = 1 €',
+			brandHeading: 'Увійдіть, щоб бачити бонусні бали',
+			brandBody: 'Дивіться баланс балів, бронюйте швидше наступного разу і зберігайте свої дані. Ваші дані лишаються приватними.',
+			secureConnection: "Захищене з'єднання",
+			comingSoon: 'Скоро',
+			orByEmail: 'або через email',
+			oauthNote: 'Вхід через Google і Telegram — скоро',
+			subtitle: 'З поверненням — оберіть спосіб входу.',
+			emailPlaceholder: 'you@example.com',
+			showPassword: 'Показати пароль',
+			hidePassword: 'Приховати пароль',
+			rememberMe: "Запам'ятати мене",
 		},
 		forgotPassword: {
 			title: 'Скидання пароля',
@@ -352,6 +412,21 @@ export const account: Record<Locale, AccountCopy> = {
 			errorInvalid: 'Неверный email или пароль.',
 			forgotPassword: 'Забыли пароль?',
 		},
+		authModal: {
+			close: 'Закрыть',
+			loyaltyBadge: '15 баллов / ночь · 10 баллов = 1 €',
+			brandHeading: 'Войдите, чтобы видеть бонусные баллы',
+			brandBody: 'Смотрите баланс баллов, бронируйте быстрее в следующий раз и храните свои данные. Ваши данные остаются приватными.',
+			secureConnection: 'Защищённое соединение',
+			comingSoon: 'Скоро',
+			orByEmail: 'или через email',
+			oauthNote: 'Вход через Google и Telegram — скоро',
+			subtitle: 'С возвращением — выберите способ входа.',
+			emailPlaceholder: 'you@example.com',
+			showPassword: 'Показать пароль',
+			hidePassword: 'Скрыть пароль',
+			rememberMe: 'Запомнить меня',
+		},
 		forgotPassword: {
 			title: 'Сброс пароля',
 			subtitle: 'Введите email, и мы отправим ссылку для сброса.',
@@ -430,6 +505,21 @@ export const account: Record<Locale, AccountCopy> = {
 			errorInvalid: 'Nepareizs e-pasts vai parole.',
 			forgotPassword: 'Aizmirsāt paroli?',
 		},
+		authModal: {
+			close: 'Aizvērt',
+			loyaltyBadge: '15 p. / naktī · 10 p. = 1 €',
+			brandHeading: 'Ienāciet, lai redzētu lojalitātes punktus',
+			brandBody: 'Skatiet savu punktu atlikumu, rezervējiet ātrāk nākamreiz un saglabājiet savus datus. Jūsu dati paliek privāti.',
+			secureConnection: 'Droši savienots',
+			comingSoon: 'Drīzumā',
+			orByEmail: 'vai ar e-pastu',
+			oauthNote: 'Google un Telegram pieteikšanās — drīzumā',
+			subtitle: 'Laipni lūdzam atpakaļ — izvēlieties, kā ienākt.',
+			emailPlaceholder: 'jus@piemers.lv',
+			showPassword: 'Rādīt paroli',
+			hidePassword: 'Slēpt paroli',
+			rememberMe: 'Atcerēties mani',
+		},
 		forgotPassword: {
 			title: 'Paroles atiestatīšana',
 			subtitle: 'Ievadiet savu e-pastu, un mēs nosūtīsim atiestatīšanas saiti.',
@@ -507,6 +597,21 @@ export const account: Record<Locale, AccountCopy> = {
 			registerLink: 'Luo tili',
 			errorInvalid: 'Väärä sähköposti tai salasana.',
 			forgotPassword: 'Unohditko salasanan?',
+		},
+		authModal: {
+			close: 'Sulje',
+			loyaltyBadge: '15 p / yö · 10 p = 1 €',
+			brandHeading: 'Kirjaudu nähdäksesi kanta-asiakaspisteesi',
+			brandBody: 'Näe pistesaldosi, varaa nopeammin seuraavalla kerralla ja säilytä tietosi tallennettuna. Tietosi pysyvät yksityisinä.',
+			secureConnection: 'Suojattu yhteys',
+			comingSoon: 'Tulossa pian',
+			orByEmail: 'tai sähköpostilla',
+			oauthNote: 'Google- ja Telegram-kirjautuminen — tulossa pian',
+			subtitle: 'Tervetuloa takaisin — valitse kirjautumistapa.',
+			emailPlaceholder: 'sina@esimerkki.fi',
+			showPassword: 'Näytä salasana',
+			hidePassword: 'Piilota salasana',
+			rememberMe: 'Muista minut',
 		},
 		forgotPassword: {
 			title: 'Salasanan palautus',

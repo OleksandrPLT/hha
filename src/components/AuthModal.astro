@@ -17,12 +17,13 @@ interface Props {
 const { locale } = Astro.props;
 const copy = account[locale].login;
 const regCopy = account[locale].register;
+const am = account[locale].authModal;
 ---
 
 <div class="auth-modal" id="auth-modal" hidden>
-	<a class="auth-modal__scrim" href="#" data-auth-close aria-label="Close"></a>
+	<a class="auth-modal__scrim" href="#" data-auth-close aria-label={am.close}></a>
 	<div class="auth-modal__overlay" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
-		<button type="button" class="auth-modal__close" data-auth-close aria-label="Close">
+		<button type="button" class="auth-modal__close" data-auth-close aria-label={am.close}>
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
 		</button>
 
@@ -32,27 +33,27 @@ const regCopy = account[locale].register;
 					<svg class="lp-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
 						<path d="M12 2l2.4 5.8 6.2.5-4.7 4.1 1.5 6.1L12 15.4 6.6 18.5l1.5-6.1-4.7-4.1 6.2-.5z" />
 					</svg>
-					<span class="lp-word">15 pts / night · 10 pts = €1</span>
+					<span class="lp-word">{am.loyaltyBadge}</span>
 				</div>
 				<Logo size={44} />
 				<div class="auth-modal__brand-copy">
-					<h2>Sign in for your loyalty points</h2>
-					<p>See your points balance, book faster next time, and keep your details on file. Your data stays private.</p>
+					<h2>{am.brandHeading}</h2>
+					<p>{am.brandBody}</p>
 				</div>
 			</div>
 			<div class="auth-modal__brand-foot">
 				<span class="dot"></span>
-				<span>Secure connection</span>
+				<span>{am.secureConnection}</span>
 			</div>
 		</div>
 
 		<div class="auth-modal__panel">
 			<p class="eyebrow-form">Hostel 3A</p>
 			<h1 id="auth-modal-title">{copy.title}</h1>
-			<p class="subtitle">Welcome back — choose how you'd like to sign in.</p>
+			<p class="subtitle">{am.subtitle}</p>
 
 			<div class="social-row">
-				<button type="button" class="social-btn" disabled title="Coming soon">
+				<button type="button" class="social-btn" disabled title={am.comingSoon}>
 					<svg viewBox="0 0 24 24">
 						<path fill="#4285F4" d="M23.52 12.27c0-.82-.07-1.6-.2-2.36H12v4.47h6.47c-.28 1.5-1.13 2.78-2.4 3.63v3.02h3.88c2.27-2.09 3.57-5.17 3.57-8.76z" />
 						<path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.88-3.02c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.11C3.24 21.3 7.29 24 12 24z" />
@@ -61,7 +62,7 @@ const regCopy = account[locale].register;
 					</svg>
 					Google
 				</button>
-				<button type="button" class="social-btn" disabled title="Coming soon">
+				<button type="button" class="social-btn" disabled title={am.comingSoon}>
 					<svg viewBox="0 0 240 240">
 						<circle cx="120" cy="120" r="120" fill="#29A9EA" />
 						<path fill="#fff" d="M52 118l128-49c6-2 11 1 9 10l-22 103c-2 8-7 10-14 6l-38-28-18 17c-2 2-4 4-8 4l3-40 73-66c3-3-1-4-4-2l-90 57-39-12c-8-3-8-9 2-10z" />
@@ -69,15 +70,15 @@ const regCopy = account[locale].register;
 					Telegram
 				</button>
 			</div>
-			<p class="oauth-note">Google &amp; Telegram sign-in — coming soon</p>
+			<p class="oauth-note">{am.oauthNote}</p>
 
-			<div class="divider"><span>or by email</span></div>
+			<div class="divider"><span>{am.orByEmail}</span></div>
 
 			<form method="POST" action={`/${locale}/account/login`} novalidate>
 				<div class="field">
 					<label for="auth-modal-email">{copy.email}</label>
 					<div class="input-wrap">
-						<input type="email" id="auth-modal-email" name="email" placeholder="you@example.com" autocomplete="email" required />
+						<input type="email" id="auth-modal-email" name="email" placeholder={am.emailPlaceholder} autocomplete="email" required />
 						<span class="icon" aria-hidden="true">
 							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h18v12H3z" /><path d="M3 7l9 6 9-6" /></svg>
 						</span>
@@ -88,7 +89,14 @@ const regCopy = account[locale].register;
 					<label for="auth-modal-password">{copy.password}</label>
 					<div class="input-wrap">
 						<input type="password" id="auth-modal-password" name="password" placeholder="••••••••" autocomplete="current-password" required />
-						<button type="button" class="toggle-pass" data-toggle-pass aria-label="Show password">
+						<button
+							type="button"
+							class="toggle-pass"
+							data-toggle-pass
+							data-show-label={am.showPassword}
+							data-hide-label={am.hidePassword}
+							aria-label={am.showPassword}
+						>
 							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" /><circle cx="12" cy="12" r="3" /></svg>
 						</button>
 					</div>
@@ -97,7 +105,7 @@ const regCopy = account[locale].register;
 				<div class="row-between">
 					<label class="remember">
 						<input type="checkbox" name="remember" />
-						Remember me
+						{am.rememberMe}
 					</label>
 					<a href={`/${locale}/account/forgot-password`} class="forgot-link">{copy.forgotPassword}</a>
 				</div>
@@ -164,7 +172,7 @@ const regCopy = account[locale].register;
 			togglePass.addEventListener('click', function () {
 				var isPass = passInput.type === 'password';
 				passInput.type = isPass ? 'text' : 'password';
-				togglePass.setAttribute('aria-label', isPass ? 'Hide password' : 'Show password');
+				togglePass.setAttribute('aria-label', isPass ? togglePass.dataset.hideLabel : togglePass.dataset.showLabel);
 			});
 		}
 

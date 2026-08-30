@@ -9,7 +9,6 @@ export const prerender = true;
 import { Image } from 'astro:assets';
 import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import LanguageModal from '../../components/LanguageModal.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import AmenityIcon from '../../components/AmenityIcon.astro';
@@ -107,7 +106,6 @@ const schema = {
 ---
 
 <BaseLayout locale={locale} title={title} description={copy.metaDescription} path="/" schema={schema}>
-	<LanguageModal locale={locale} />
 	<SiteHeader locale={locale} />
 
 	<main>
