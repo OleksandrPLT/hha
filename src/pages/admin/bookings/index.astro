@@ -1,0 +1,228 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../db/client';
+import { admins, bookings, rooms } from '../../../db/schema';
+import { eq, desc } from 'drizzle-orm';
+import { getAdminLocale, admin as adminCopy } from '../../../i18n/admin';
+import { currency } from '../../../data/pricing';
+
+export const prerender = false;
+
+const adminId = await Astro.session?.get('adminId');
+if (!adminId) {
+	return Astro.redirect('/admin/login');
+}
+const currentAdmin = db.select().from(admins).where(eq(admins.id, adminId)).get();
+if (!currentAdmin) {
+	return Astro.redirect('/admin/login');
+}
+
+const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = adminCopy[locale].bookings;
+
+const statusFilter = Astro.url.searchParams.get('status') || '';
+const allBookings = db.select().from(bookings).orderBy(desc(bookings.createdAt)).all();
+const filtered = statusFilter ? allBookings.filter((b) => b.status === statusFilter) : allBookings;
+
+const roomsById = new Map(db.select().from(rooms).all().map((r) => [r.id, r]));
+
+function roomTitle(roomId: number): string {
+	const room = roomsById.get(roomId);
+	if (!room) return '—';
+	try {
+		const parsed = JSON.parse(room.titles) as Record<string, string>;
+		return parsed.en ?? room.slug;
+	} catch {
+		return room.slug;
+	}
+}
+
+const statusLabels: Record<string, string> = {
+	pending: copy.statusPending,
+	confirmed: copy.statusConfirmed,
+	cancelled: copy.statusCancelled,
+	completed: copy.statusCompleted,
+};
+const paymentLabels: Record<string, string> = {
+	unpaid: copy.paymentUnpaid,
+	paid: copy.paymentPaid,
+	refunded: copy.paymentRefunded,
+};
+
+function euro(cents: number): string {
+	return `${currency}${(cents / 100).toFixed(2)}`;
+}
+---
+
+<AdminLayout title={copy.title} adminName={currentAdmin.fullName} activeNav="bookings">
+	<div class="page-head">
+		<h1>{copy.title}</h1>
+	</div>
+	<p class="page-subtitle">{copy.subtitle}</p>
+
+	<div class="filter-row">
+		<a href="/admin/bookings" class={!statusFilter ? 'filter-chip is-active' : 'filter-chip'}>{copy.filterAll}</a>
+		{
+			(['pending', 'confirmed', 'completed', 'cancelled'] as const).map((s) => (
+				<a href={`/admin/bookings?status=${s}`} class={statusFilter === s ? 'filter-chip is-active' : 'filter-chip'}>
+					{statusLabels[s]}
+				</a>
+			))
+		}
+	</div>
+
+	{
+		filtered.length === 0 ? (
+			<p class="empty-note">{copy.empty}</p>
+		) : (
+			<div class="table-wrap">
+				<table>
+					<thead>
+						<tr>
+							<th>{copy.colId}</th>
+							<th>{copy.colRoom}</th>
+							<th>{copy.colGuest}</th>
+							<th>{copy.colDates}</th>
+							<th>{copy.colTotal}</th>
+							<th>{copy.colStatus}</th>
+							<th>{copy.colPayment}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{filtered.map((b) => (
+							<tr>
+								<td><a href={`/admin/bookings/${b.id}`}>#{b.id}</a></td>
+								<td>{roomTitle(b.roomId)}</td>
+								<td>{b.fullName}</td>
+								<td class="mono">{b.checkIn} → {b.checkOut}</td>
+								<td>{euro(b.totalCents)}</td>
+								<td><span class={`status-badge status-badge--${b.status}`}>{statusLabels[b.status] ?? b.status}</span></td>
+								<td><span class={`status-badge ${b.paymentStatus === 'paid' ? 'status-badge--active' : ''}`}>{paymentLabels[b.paymentStatus] ?? b.paymentStatus}</span></td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+		)
+	}
+
+	<style>
+		.page-head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 0.4rem;
+		}
+
+		h1 {
+			margin: 0;
+			font-size: 1.4rem;
+			font-weight: 700;
+		}
+
+		.page-subtitle {
+			margin: 0 0 1.25rem;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+			max-width: 40rem;
+		}
+
+		.filter-row {
+			display: flex;
+			gap: 0.4rem;
+			margin-bottom: 1.25rem;
+			flex-wrap: wrap;
+		}
+
+		.filter-chip {
+			font-size: 0.78rem;
+			font-weight: 600;
+			padding: 0.35rem 0.8rem;
+			border-radius: 999px;
+			border: 1px solid var(--border-light);
+			color: var(--text-dark-muted);
+			text-decoration: none;
+			background: #fff;
+		}
+
+		.filter-chip.is-active {
+			background: var(--bg-dark);
+			color: var(--cream);
+			border-color: var(--bg-dark);
+		}
+
+		.empty-note {
+			color: var(--text-dark-muted);
+			font-size: 0.88rem;
+		}
+
+		.table-wrap {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			overflow-x: auto;
+		}
+
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 0.85rem;
+		}
+
+		th,
+		td {
+			text-align: left;
+			padding: 0.65rem 1rem;
+			white-space: nowrap;
+			vertical-align: middle;
+		}
+
+		.mono {
+			font-size: 0.78rem;
+			color: var(--text-dark-muted);
+		}
+
+		thead th {
+			font-size: 0.72rem;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			color: var(--text-dark-muted);
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		tbody tr:not(:last-child) td {
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		tbody a {
+			color: var(--accent);
+			font-weight: 600;
+			text-decoration: none;
+		}
+
+		tbody a:hover {
+			text-decoration: underline;
+		}
+
+		.status-badge {
+			border-radius: 999px;
+			padding: 0.25rem 0.7rem;
+			font-size: 0.72rem;
+			font-weight: 700;
+			background: var(--border-light);
+			color: var(--text-dark-muted);
+		}
+
+		.status-badge--confirmed,
+		.status-badge--completed,
+		.status-badge--active {
+			background: rgba(63, 122, 79, 0.12);
+			color: var(--success);
+		}
+
+		.status-badge--cancelled {
+			background: rgba(179, 67, 47, 0.12);
+			color: var(--danger);
+		}
+	</style>
+</AdminLayout>

@@ -1,0 +1,288 @@
+---
+// Фаза 4 — сторінка підтвердження бронювання. Доступ обмежений: власник
+// сесії (guestId збігається) АБО щойно створив цю бронь у цій самій сесії
+// (lastBookingId, встановлюється в [slug].astro перед редіректом) — інакше
+// будь-хто міг би переглядати чужі брони, підбираючи id в URL.
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import SiteHeader from '../../../../components/SiteHeader.astro';
+import SiteFooter from '../../../../components/SiteFooter.astro';
+import { isLocale, defaultLocale, type Locale } from '../../../../i18n/locales';
+import { booking as bookingCopy } from '../../../../i18n/booking';
+import { db } from '../../../../db/client';
+import { bookings, rooms } from '../../../../db/schema';
+import { eq } from 'drizzle-orm';
+import { isRevolutConfigured } from '../../../../lib/revolut';
+import { currency } from '../../../../data/pricing';
+
+export const prerender = false;
+
+const rawLocale = Astro.params.locale;
+if (!rawLocale || !isLocale(rawLocale)) {
+	return Astro.redirect(`/${defaultLocale}`);
+}
+const locale: Locale = rawLocale;
+const copy = bookingCopy[locale].confirmation;
+
+const bookingId = Number(Astro.params.id);
+if (!Number.isInteger(bookingId)) {
+	return Astro.redirect(`/${locale}`);
+}
+
+const bk = db.select().from(bookings).where(eq(bookings.id, bookingId)).get();
+if (!bk) {
+	return Astro.redirect(`/${locale}`);
+}
+
+const sessionGuestId = await Astro.session?.get('guestId');
+const lastBookingId = await Astro.session?.get('lastBookingId');
+const isOwner = (sessionGuestId && sessionGuestId === bk.guestId) || lastBookingId === bk.id;
+if (!isOwner) {
+	return Astro.redirect(`/${locale}`);
+}
+
+const room = db.select().from(rooms).where(eq(rooms.id, bk.roomId)).get();
+function pickLocale(json: string | undefined): string {
+	if (!json) return '';
+	try {
+		const parsed = JSON.parse(json) as Record<string, string>;
+		return parsed[locale] ?? parsed.en ?? '';
+	} catch {
+		return '';
+	}
+}
+const roomTitle = room ? pickLocale(room.titles) : '';
+
+const needsPayment = bk.paymentMethod === 'revolut' && bk.paymentStatus !== 'paid';
+const revolutReady = isRevolutConfigured() && Boolean(bk.paymentRef);
+---
+
+<BaseLayout locale={locale} title={copy.heading} description={bookingCopy[locale].meta.description} path={`/book/confirmation/${bookingId}`}>
+	<SiteHeader locale={locale} />
+
+	<main class="confirmation-page">
+		<div class="container">
+			<div class="confirmation-card">
+				<h1>{copy.heading}</h1>
+				<p class="subtitle">{copy.subheading}</p>
+
+				<dl class="details">
+					<div><dt>{copy.refLabel}</dt><dd>#{bk.id}</dd></div>
+					<div><dt>{bookingCopy[locale].page.roomLabel}</dt><dd>{roomTitle}</dd></div>
+					<div><dt>{bookingCopy[locale].page.checkIn}</dt><dd>{bk.checkIn}</dd></div>
+					<div><dt>{bookingCopy[locale].page.checkOut}</dt><dd>{bk.checkOut}</dd></div>
+					<div><dt>{bookingCopy[locale].page.summaryTotal}</dt><dd>{currency}{(bk.totalCents / 100).toFixed(2)}</dd></div>
+				</dl>
+
+				<p class="status-badge" class:list={[bk.status === 'confirmed' ? 'is-confirmed' : 'is-pending']}>
+					{bk.status === 'confirmed' ? copy.statusConfirmed : copy.statusPending}
+				</p>
+
+				{
+					needsPayment && revolutReady ? (
+						<div class="pay-box">
+							<button type="button" id="revolut-pay-btn" class="btn btn--primary-dark">
+								{bookingCopy[locale].page.paymentRevolut}
+							</button>
+							<p id="pay-status" class="pay-status" hidden></p>
+						</div>
+					) : needsPayment ? (
+						<p class="note">{copy.payAtCheckinNote}</p>
+					) : (
+						<p class="note">{copy.paidNote}</p>
+					)
+				}
+
+				<p class="note">{copy.emailSent}</p>
+				<p class="note">{copy.pointsNote}</p>
+
+				<a href={`/${locale}`} class="btn btn--ghost-dark">{copy.backHome}</a>
+			</div>
+		</div>
+	</main>
+
+	<SiteFooter locale={locale} />
+
+	{
+		needsPayment && revolutReady && (
+			<Fragment>
+				<script src="https://merchant.revolut.com/embed.js" is:inline />
+				<script define:vars={{ publicId: bk.paymentRef, bookingId: bk.id, fullName: bk.fullName, email: bk.email }}>
+					const btn = document.getElementById('revolut-pay-btn');
+					const statusEl = document.getElementById('pay-status');
+
+					async function verifyOnServer() {
+						statusEl.hidden = false;
+						statusEl.textContent = 'Verifying payment…';
+						try {
+							const res = await fetch('/api/booking/confirm-payment', {
+								method: 'POST',
+								headers: { 'Content-Type': 'application/json' },
+								body: JSON.stringify({ bookingId }),
+							});
+							const data = await res.json();
+							if (data.paid) {
+								window.location.reload();
+							} else {
+								statusEl.textContent = 'Payment not completed yet.';
+							}
+						} catch {
+							statusEl.textContent = 'Could not verify payment — please refresh.';
+						}
+					}
+
+					btn?.addEventListener('click', () => {
+						if (typeof RevolutCheckout === 'undefined') {
+							statusEl.hidden = false;
+							statusEl.textContent = 'Payment widget failed to load.';
+							return;
+						}
+						RevolutCheckout(publicId, 'prod').then((instance) => {
+							instance.payWithPopup({
+								name: fullName,
+								email: email,
+								onSuccess() {
+									verifyOnServer();
+								},
+								onError() {
+									statusEl.hidden = false;
+									statusEl.textContent = 'Payment failed — please try again.';
+								},
+							});
+						});
+					});
+				</script>
+			</Fragment>
+		)
+	}
+
+	<style>
+		.confirmation-page {
+			background: var(--bg-light);
+			min-height: 70vh;
+			padding: 3rem 0 4rem;
+		}
+
+		.container {
+			max-width: 32rem;
+			margin: 0 auto;
+			padding: 0 1.25rem;
+		}
+
+		.confirmation-card {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 1rem;
+			padding: 2rem 1.75rem;
+			text-align: center;
+		}
+
+		h1 {
+			margin: 0 0 0.4rem;
+			font-size: clamp(1.4rem, 4vw, 1.8rem);
+			font-weight: 800;
+		}
+
+		.subtitle {
+			margin: 0 0 1.5rem;
+			color: var(--text-dark-muted);
+			font-size: 0.92rem;
+		}
+
+		.details {
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+			text-align: left;
+			background: var(--bg-light);
+			border-radius: 0.7rem;
+			padding: 1rem 1.1rem;
+			margin: 0 0 1rem;
+		}
+
+		.details div {
+			display: flex;
+			justify-content: space-between;
+			font-size: 0.88rem;
+		}
+
+		.details dt {
+			color: var(--text-dark-muted);
+			font-weight: 400;
+		}
+
+		.details dd {
+			margin: 0;
+			font-weight: 700;
+		}
+
+		.status-badge {
+			display: inline-block;
+			padding: 0.3rem 0.8rem;
+			border-radius: 999px;
+			font-size: 0.78rem;
+			font-weight: 700;
+			margin: 0 0 1.25rem;
+		}
+
+		.status-badge.is-pending {
+			background: rgba(210, 150, 40, 0.14);
+			color: #a16a1a;
+		}
+
+		.status-badge.is-confirmed {
+			background: rgba(63, 122, 79, 0.14);
+			color: #2e7d4f;
+		}
+
+		.pay-box {
+			margin-bottom: 1.25rem;
+		}
+
+		.pay-status {
+			margin: 0.6rem 0 0;
+			font-size: 0.82rem;
+			color: var(--text-dark-muted);
+		}
+
+		.note {
+			margin: 0 0 0.6rem;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+		}
+
+		.btn {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			padding: 0.75rem 1.2rem;
+			border-radius: 0.6rem;
+			font-weight: 700;
+			font-size: 0.9rem;
+			font-family: inherit;
+			border: none;
+			cursor: pointer;
+			text-decoration: none;
+			width: 100%;
+		}
+
+		.btn--primary-dark {
+			background: var(--text-dark);
+			color: var(--bg-light);
+		}
+
+		.btn--primary-dark:hover {
+			filter: brightness(1.2);
+		}
+
+		.btn--ghost-dark {
+			border: 1px solid var(--border-light);
+			color: var(--text-dark);
+			margin-top: 0.5rem;
+		}
+
+		.btn--ghost-dark:hover {
+			border-color: var(--accent);
+			color: var(--accent);
+		}
+	</style>
+</BaseLayout>

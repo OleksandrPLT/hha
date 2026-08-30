@@ -1,0 +1,332 @@
+---
+// Деталі бронювання (Фаза 4). Тут адмін вручну веде статус (pending →
+// confirmed/cancelled/completed) і позначає оплату — без зовнішньої
+// синхронізації немає автоматичного "прийшов гість" сигналу. При
+// переведенні в 'completed' автоматично нараховуються бали лояльності
+// (той самий pointsForStay, що й в описі схеми), якщо є прив'язаний
+// акаунт і бали ще не нараховувались (pointsAwarded).
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../db/client';
+import { admins, bookings, rooms, guests, guestNotes } from '../../../db/schema';
+import { eq } from 'drizzle-orm';
+import { getAdminLocale, admin as adminCopy } from '../../../i18n/admin';
+import { currency } from '../../../data/pricing';
+import { pointsForStay } from '../../../data/loyalty';
+
+export const prerender = false;
+
+const adminId = await Astro.session?.get('adminId');
+if (!adminId) {
+	return Astro.redirect('/admin/login');
+}
+const currentAdmin = db.select().from(admins).where(eq(admins.id, adminId)).get();
+if (!currentAdmin) {
+	return Astro.redirect('/admin/login');
+}
+
+const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = adminCopy[locale].bookingDetail;
+const listCopy = adminCopy[locale].bookings;
+
+const bookingId = Number(Astro.params.id);
+if (!Number.isInteger(bookingId)) {
+	return Astro.redirect('/admin/bookings');
+}
+
+let bk = db.select().from(bookings).where(eq(bookings.id, bookingId)).get();
+if (!bk) {
+	return Astro.redirect('/admin/bookings');
+}
+
+let notice = '';
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	const action = String(form.get('action') || '');
+
+	if (action === 'mark-paid') {
+		db.update(bookings).set({ paymentStatus: 'paid' }).where(eq(bookings.id, bookingId)).run();
+		notice = copy.notice;
+	} else if (action === 'set-status') {
+		const newStatus = String(form.get('status') || '');
+		if (['pending', 'confirmed', 'cancelled', 'completed'].includes(newStatus)) {
+			db.update(bookings).set({ status: newStatus }).where(eq(bookings.id, bookingId)).run();
+
+			if (newStatus === 'completed' && !bk.pointsAwarded && bk.guestId) {
+				const guest = db.select().from(guests).where(eq(guests.id, bk.guestId)).get();
+				if (guest) {
+					const points = pointsForStay(bk.nights);
+					const newTotal = guest.loyaltyPoints + points;
+					db.update(guests).set({ loyaltyPoints: newTotal }).where(eq(guests.id, guest.id)).run();
+					db.insert(guestNotes)
+						.values({
+							guestId: guest.id,
+							authorId: adminId,
+							body: `+${points} балів за бронювання #${bk.id} (${bk.checkIn} → ${bk.checkOut}). Новий баланс: ${newTotal}.`,
+						})
+						.run();
+					db.update(bookings).set({ pointsAwarded: true }).where(eq(bookings.id, bookingId)).run();
+				}
+			}
+			notice = copy.notice;
+		}
+	}
+
+	bk = db.select().from(bookings).where(eq(bookings.id, bookingId)).get()!;
+}
+
+const room = db.select().from(rooms).where(eq(rooms.id, bk.roomId)).get();
+function roomTitle(): string {
+	if (!room) return '—';
+	try {
+		const parsed = JSON.parse(room.titles) as Record<string, string>;
+		return parsed.en ?? room.slug;
+	} catch {
+		return room.slug;
+	}
+}
+const linkedGuest = bk.guestId ? db.select().from(guests).where(eq(guests.id, bk.guestId)).get() : undefined;
+
+const statusLabels: Record<string, string> = {
+	pending: listCopy.statusPending,
+	confirmed: listCopy.statusConfirmed,
+	cancelled: listCopy.statusCancelled,
+	completed: listCopy.statusCompleted,
+};
+const paymentLabels: Record<string, string> = {
+	unpaid: listCopy.paymentUnpaid,
+	paid: listCopy.paymentPaid,
+	refunded: listCopy.paymentRefunded,
+};
+
+function euro(cents: number): string {
+	return `${currency}${(cents / 100).toFixed(2)}`;
+}
+---
+
+<AdminLayout title={`${copy.refLabel} #${bk.id}`} adminName={currentAdmin.fullName} activeNav="bookings">
+	<a href="/admin/bookings" class="back-link">{copy.back}</a>
+	<div class="page-head">
+		<h1>{copy.refLabel} #{bk.id}</h1>
+		<span class={`status-badge status-badge--${bk.status}`}>{statusLabels[bk.status] ?? bk.status}</span>
+	</div>
+
+	{notice && <p class="notice">{notice}</p>}
+
+	<div class="detail-grid">
+		<section class="card">
+			<h2>{copy.guestSection}</h2>
+			<dl>
+				<div><dt>{copy.fullName}</dt><dd>{bk.fullName}</dd></div>
+				<div><dt>{copy.email}</dt><dd>{bk.email}</dd></div>
+				<div><dt>{copy.phone}</dt><dd>{bk.phone}</dd></div>
+				<div>
+					<dt>{copy.linkedAccount}</dt>
+					<dd>{linkedGuest ? <a href={`/admin/guests/${linkedGuest.id}`}>{linkedGuest.fullName}</a> : copy.guestBooking}</dd>
+				</div>
+			</dl>
+		</section>
+
+		<section class="card">
+			<h2>{copy.staySection}</h2>
+			<dl>
+				<div><dt>{listCopy.colRoom}</dt><dd>{roomTitle()}</dd></div>
+				<div><dt>{copy.checkIn}</dt><dd>{bk.checkIn}</dd></div>
+				<div><dt>{copy.checkOut}</dt><dd>{bk.checkOut}</dd></div>
+				<div><dt>{copy.nights}</dt><dd>{bk.nights}</dd></div>
+				<div><dt>{copy.guestsCount}</dt><dd>{bk.guestsCount}</dd></div>
+				{bk.specialRequests && (
+					<div><dt>{copy.specialRequests}</dt><dd>{bk.specialRequests}</dd></div>
+				)}
+			</dl>
+		</section>
+
+		<section class="card">
+			<h2>{copy.paymentSection}</h2>
+			<dl>
+				<div><dt>{copy.method}</dt><dd>{bk.paymentMethod === 'revolut' ? copy.methodRevolut : copy.methodCash}</dd></div>
+				<div><dt>{copy.status}</dt><dd>{paymentLabels[bk.paymentStatus] ?? bk.paymentStatus}</dd></div>
+				<div><dt>{copy.pricePerNight}</dt><dd>{euro(bk.pricePerNightCents)}</dd></div>
+				<div><dt>{copy.total}</dt><dd><strong>{euro(bk.totalCents)}</strong></dd></div>
+			</dl>
+			{bk.paymentStatus !== 'paid' && (
+				<form method="POST">
+					<input type="hidden" name="action" value="mark-paid" />
+					<button type="submit" class="btn-secondary">{copy.markPaid}</button>
+				</form>
+			)}
+		</section>
+
+		<section class="card">
+			<h2>{copy.statusSection}</h2>
+			<div class="status-actions">
+				{(['pending', 'confirmed', 'completed', 'cancelled'] as const).map((s) => (
+					<form method="POST">
+						<input type="hidden" name="action" value="set-status" />
+						<input type="hidden" name="status" value={s} />
+						<button type="submit" disabled={bk.status === s} class={bk.status === s ? 'status-btn is-current' : 'status-btn'}>
+							{statusLabels[s]}
+						</button>
+					</form>
+				))}
+			</div>
+			<p class="field-note">{copy.completedHint}</p>
+			{bk.pointsAwarded && <p class="field-note points-awarded">{copy.pointsAwarded}</p>}
+		</section>
+	</div>
+
+	<style>
+		.back-link {
+			display: inline-block;
+			margin-bottom: 0.75rem;
+			font-size: 0.82rem;
+			color: var(--text-dark-muted);
+			text-decoration: none;
+		}
+
+		.back-link:hover {
+			color: var(--accent);
+		}
+
+		.page-head {
+			display: flex;
+			align-items: center;
+			gap: 0.75rem;
+			margin-bottom: 1.25rem;
+		}
+
+		h1 {
+			margin: 0;
+			font-size: 1.4rem;
+			font-weight: 700;
+		}
+
+		.notice {
+			background: rgba(63, 122, 79, 0.1);
+			color: var(--success);
+			border: 1px solid rgba(63, 122, 79, 0.3);
+			border-radius: 0.6rem;
+			padding: 0.6rem 0.9rem;
+			margin: 0 0 1rem;
+			font-size: 0.85rem;
+		}
+
+		.detail-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 1rem;
+		}
+
+		.card {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			padding: 1.25rem;
+		}
+
+		.card h2 {
+			margin: 0 0 0.9rem;
+			font-size: 0.95rem;
+			font-weight: 700;
+		}
+
+		dl {
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+			margin: 0;
+		}
+
+		dl div {
+			display: flex;
+			justify-content: space-between;
+			gap: 1rem;
+			font-size: 0.85rem;
+		}
+
+		dt {
+			color: var(--text-dark-muted);
+		}
+
+		dd {
+			margin: 0;
+			text-align: right;
+			font-weight: 600;
+		}
+
+		dd a {
+			color: var(--accent);
+		}
+
+		.btn-secondary,
+		.status-btn {
+			font: inherit;
+			font-size: 0.8rem;
+			font-weight: 700;
+			padding: 0.5rem 0.9rem;
+			border-radius: 0.5rem;
+			border: 1px solid var(--border-light);
+			background: #fff;
+			cursor: pointer;
+			color: var(--text-dark);
+		}
+
+		.btn-secondary {
+			margin-top: 1rem;
+			width: 100%;
+			background: var(--bg-dark);
+			color: var(--cream);
+			border: none;
+		}
+
+		.status-actions {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.4rem;
+		}
+
+		.status-btn.is-current {
+			background: var(--bg-dark);
+			color: var(--cream);
+			border-color: var(--bg-dark);
+			cursor: not-allowed;
+		}
+
+		.field-note {
+			margin: 0.75rem 0 0;
+			font-size: 0.78rem;
+			color: var(--text-dark-muted);
+		}
+
+		.points-awarded {
+			color: var(--success);
+			font-weight: 600;
+		}
+
+		.status-badge {
+			border-radius: 999px;
+			padding: 0.25rem 0.7rem;
+			font-size: 0.72rem;
+			font-weight: 700;
+			background: var(--border-light);
+			color: var(--text-dark-muted);
+		}
+
+		.status-badge--confirmed,
+		.status-badge--completed {
+			background: rgba(63, 122, 79, 0.12);
+			color: var(--success);
+		}
+
+		.status-badge--cancelled {
+			background: rgba(179, 67, 47, 0.12);
+			color: var(--danger);
+		}
+
+		@media (max-width: 760px) {
+			.detail-grid {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+</AdminLayout>

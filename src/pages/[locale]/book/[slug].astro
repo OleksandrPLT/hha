@@ -1,0 +1,560 @@
+---
+// Фаза 4 (система бронювань, ТЗ §5.4) — публічна форма прямого
+// бронювання конкретного номера. Власний календар, без синхронізації із
+// зовнішніми каналами (Booking.com і т.д.) — див. src/lib/booking.ts.
+// Гостьовий чекаут дозволений (акаунт не обов'язковий), але якщо гість
+// залогінений — підтягуємо його дані для автозаповнення й прив'язуємо
+// guestId до бронювання (бали лояльності нараховуються тільки тоді).
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import SiteHeader from '../../../components/SiteHeader.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import PhoneInput from '../../../components/PhoneInput.astro';
+import { isLocale, defaultLocale, type Locale } from '../../../i18n/locales';
+import { booking as bookingCopy } from '../../../i18n/booking';
+import { db } from '../../../db/client';
+import { rooms, roomPhotos, guests, bookings } from '../../../db/schema';
+import { eq, asc } from 'drizzle-orm';
+import { isValidEmail } from '../../../lib/auth';
+import { isValidDateRange, nightsBetween, isRoomAvailable } from '../../../lib/booking';
+import { isRevolutConfigured, createRevolutOrder } from '../../../lib/revolut';
+import { vatRatePercent, currency } from '../../../data/pricing';
+import { sendMail } from '../../../lib/mailer';
+
+export const prerender = false;
+
+const rawLocale = Astro.params.locale;
+if (!rawLocale || !isLocale(rawLocale)) {
+	return Astro.redirect(`/${defaultLocale}/book/${Astro.params.slug}`);
+}
+const locale: Locale = rawLocale;
+const copy = bookingCopy[locale].page;
+
+const slug = String(Astro.params.slug || '');
+const room = db.select().from(rooms).where(eq(rooms.slug, slug)).get();
+if (!room || !room.isActive) {
+	return Astro.redirect(`/${locale}#rooms`);
+}
+const photos = db.select().from(roomPhotos).where(eq(roomPhotos.roomId, room.id)).orderBy(asc(roomPhotos.sortOrder)).all();
+
+function pickLocale(json: string): string {
+	try {
+		const parsed = JSON.parse(json) as Record<string, string>;
+		return parsed[locale] ?? parsed.en ?? '';
+	} catch {
+		return '';
+	}
+}
+const roomTitle = pickLocale(room.titles);
+const roomBeds = pickLocale(room.beds);
+const roomGuests = pickLocale(room.guests);
+
+function withVatCents(cents: number): number {
+	return Math.round(cents * (1 + vatRatePercent / 100));
+}
+
+const guestId = await Astro.session?.get('guestId');
+const account = guestId ? db.select().from(guests).where(eq(guests.id, guestId)).get() : undefined;
+
+const url = new URL(Astro.request.url);
+let values: Record<string, string> = {
+	checkIn: url.searchParams.get('checkIn') ?? '',
+	checkOut: url.searchParams.get('checkOut') ?? '',
+	guestsCount: url.searchParams.get('guests') ?? '1',
+	fullName: account?.fullName ?? '',
+	email: account?.email ?? '',
+	phone: account?.phone?.split(' ').slice(1).join(' ') ?? '',
+	phone_country: account?.phone?.split(' ')[0] ?? '+372',
+};
+
+let error = '';
+const revolutReady = isRevolutConfigured();
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	values = Object.fromEntries([...form.entries()].map(([k, v]) => [k, String(v)]));
+
+	const checkIn = String(form.get('checkIn') || '');
+	const checkOut = String(form.get('checkOut') || '');
+	const guestsCount = Math.max(1, Math.min(10, Number(form.get('guestsCount')) || 1));
+	const fullName = String(form.get('fullName') || '').trim();
+	const email = String(form.get('email') || '').trim().toLowerCase();
+	const phoneCountry = String(form.get('phone_country') || '');
+	const phoneNumber = String(form.get('phone') || '').trim();
+	const specialRequests = String(form.get('specialRequests') || '').trim();
+	const paymentMethod = form.get('paymentMethod') === 'revolut' && revolutReady ? 'revolut' : 'cash';
+	const consent = form.get('consent') === 'on';
+
+	if (!isValidDateRange(checkIn, checkOut) || !fullName || !isValidEmail(email) || !phoneNumber) {
+		error = copy.errorGeneric;
+	} else if (!consent) {
+		error = copy.errorConsent;
+	} else if (!isRoomAvailable(room.id, room.quantity, checkIn, checkOut)) {
+		error = copy.errorUnavailable;
+	} else {
+		const nights = nightsBetween(checkIn, checkOut);
+		const totalCents = nights * withVatCents(room.pricePerNightCents);
+
+		const inserted = db
+			.insert(bookings)
+			.values({
+				roomId: room.id,
+				guestId: guestId ?? null,
+				fullName,
+				email,
+				phone: `${phoneCountry} ${phoneNumber}`,
+				checkIn,
+				checkOut,
+				nights,
+				guestsCount,
+				pricePerNightCents: withVatCents(room.pricePerNightCents),
+				totalCents,
+				status: 'pending',
+				paymentStatus: 'unpaid',
+				paymentMethod,
+				specialRequests: specialRequests || null,
+			})
+			.run();
+		const bookingId = Number(inserted.lastInsertRowid);
+
+		if (paymentMethod === 'revolut') {
+			try {
+				const order = await createRevolutOrder({
+					amountCents: totalCents,
+					currency: 'EUR',
+					description: `Hostel 3A — ${roomTitle}, ${checkIn} → ${checkOut}`,
+					email,
+					ref: `booking-${bookingId}`,
+				});
+				db.update(bookings).set({ paymentRef: order.id }).where(eq(bookings.id, bookingId)).run();
+			} catch {
+				// Revolut тимчасово недоступний — бронь лишається зі
+				// status=pending/paymentMethod=revolut, paymentRef=null;
+				// сторінка підтвердження в цьому разі сама пропонує оплату
+				// на місці замість зламаного віджета.
+			}
+		}
+
+		try {
+			await sendMail(
+				email,
+				bookingCopy[locale].meta.title,
+				`<p>${bookingCopy[locale].confirmation.heading}</p><p>${roomTitle}, ${checkIn} → ${checkOut} (${nights} ${copy.summaryNights})</p><p>${copy.summaryTotal}: ${currency}${(totalCents / 100).toFixed(2)}</p>`,
+			);
+		} catch {
+			// SMTP може бути не налаштований/недоступний — бронювання все одно валідне.
+		}
+
+		await Astro.session?.set('lastBookingId', bookingId);
+		return Astro.redirect(`/${locale}/book/confirmation/${bookingId}`);
+	}
+}
+---
+
+<BaseLayout locale={locale} title={bookingCopy[locale].meta.title} description={bookingCopy[locale].meta.description} path={`/book/${slug}`}>
+	<SiteHeader locale={locale} />
+
+	<main class="booking-page">
+		<div class="container">
+			<a class="back-link" href={`/${locale}#rooms`}>{copy.backToRoom}</a>
+
+			<div class="booking-layout">
+				<div class="booking-form-col">
+					<h1>{copy.heading}</h1>
+					<p class="subtitle">{copy.subheading}</p>
+
+					{error && <p class="form-error">{error}</p>}
+					{!account && <p class="login-hint">{copy.loginHint}</p>}
+
+					<form method="POST" class="booking-form" id="booking-form">
+						<div class="field-row">
+							<label>
+								{copy.checkIn}
+								<input type="date" name="checkIn" id="checkIn" required value={values.checkIn} />
+							</label>
+							<label>
+								{copy.checkOut}
+								<input type="date" name="checkOut" id="checkOut" required value={values.checkOut} />
+							</label>
+						</div>
+						<label>
+							{copy.guestsCount}
+							<input type="number" name="guestsCount" id="guestsCount" min="1" max="10" required value={values.guestsCount} />
+						</label>
+
+						<button type="button" id="check-availability-btn" class="btn btn--check">{copy.checkBtn}</button>
+						<p id="availability-msg" class="availability-msg" hidden></p>
+
+						<hr />
+
+						<h2 class="section-heading">{copy.detailsHeading}</h2>
+						<label>
+							{copy.fullName}
+							<input type="text" name="fullName" required value={values.fullName} />
+						</label>
+						<label>
+							{copy.email}
+							<input type="email" name="email" required value={values.email} />
+						</label>
+						<label>
+							{copy.phone}
+							<PhoneInput name="phone" required value={values.phone} countryValue={values.phone_country} />
+						</label>
+						<label>
+							{copy.specialRequests}
+							<textarea name="specialRequests" rows="3" placeholder={copy.specialRequestsPlaceholder}>{values.specialRequests ?? ''}</textarea>
+						</label>
+
+						<h2 class="section-heading">{copy.paymentHeading}</h2>
+						<div class="payment-options">
+							<label class="payment-option">
+								<input type="radio" name="paymentMethod" value="cash" checked={values.paymentMethod !== 'revolut'} />
+								<span>
+									<strong>{copy.paymentCash}</strong>
+									<small>{copy.paymentCashHint}</small>
+								</span>
+							</label>
+							{
+								revolutReady && (
+									<label class="payment-option">
+										<input type="radio" name="paymentMethod" value="revolut" checked={values.paymentMethod === 'revolut'} />
+										<span>
+											<strong>{copy.paymentRevolut}</strong>
+											<small>{copy.paymentRevolutHint}</small>
+										</span>
+									</label>
+								)
+							}
+						</div>
+
+						<label class="checkbox-row">
+							<input type="checkbox" name="consent" required />
+							<span>{copy.consentLabel}</span>
+						</label>
+
+						<button type="submit" class="btn btn--primary-dark" id="submit-btn">{copy.submitBtn}</button>
+					</form>
+				</div>
+
+				<aside class="booking-summary">
+					<div class="summary-card">
+						{room.slug && photos[0] && <img src={photos[0].photoUrl} alt={roomTitle} class="summary-card__img" />}
+						<h3>{roomTitle}</h3>
+						<p class="summary-meta">{roomBeds} · {roomGuests}</p>
+						<div class="summary-row">
+							<span>{currency}{(room.pricePerNightCents / 100).toFixed(2)} / {copy.summaryNights.replace(/s?$/, '')}</span>
+						</div>
+						<div class="summary-row summary-row--total" id="summary-total-row" hidden>
+							<span id="summary-nights-label"></span>
+							<strong id="summary-total"></strong>
+						</div>
+					</div>
+				</aside>
+			</div>
+		</div>
+	</main>
+
+	<SiteFooter locale={locale} />
+
+	<script define:vars={{ roomId: room.id, pricePerNightCents: room.pricePerNightCents, vatRatePercent, currency, nightsLabel: copy.summaryNights, totalLabel: copy.summaryTotal, checkingLabel: copy.checking, availableLabel: copy.available, notAvailableLabel: copy.notAvailable }}>
+		const checkInEl = document.getElementById('checkIn');
+		const checkOutEl = document.getElementById('checkOut');
+		const guestsEl = document.getElementById('guestsCount');
+		const msgEl = document.getElementById('availability-msg');
+		const btn = document.getElementById('check-availability-btn');
+		const totalRow = document.getElementById('summary-total-row');
+		const nightsLabelEl = document.getElementById('summary-nights-label');
+		const totalEl = document.getElementById('summary-total');
+
+		const today = new Date().toISOString().slice(0, 10);
+		if (checkInEl) checkInEl.min = today;
+		if (checkOutEl) checkOutEl.min = today;
+
+		function updateSummary() {
+			const ci = checkInEl?.value;
+			const co = checkOutEl?.value;
+			if (!ci || !co) { totalRow?.setAttribute('hidden', ''); return; }
+			const nights = Math.round((new Date(co + 'T00:00:00Z').getTime() - new Date(ci + 'T00:00:00Z').getTime()) / 86400000);
+			if (nights < 1) { totalRow?.setAttribute('hidden', ''); return; }
+			const totalCents = Math.round(nights * pricePerNightCents * (1 + vatRatePercent / 100));
+			if (nightsLabelEl) nightsLabelEl.textContent = `${nights} ${nightsLabel}`;
+			if (totalEl) totalEl.textContent = `${totalLabel}: ${currency}${(totalCents / 100).toFixed(2)}`;
+			totalRow?.removeAttribute('hidden');
+			if (checkOutEl) checkOutEl.min = ci;
+		}
+
+		checkInEl?.addEventListener('change', updateSummary);
+		checkOutEl?.addEventListener('change', updateSummary);
+		updateSummary();
+
+		btn?.addEventListener('click', async () => {
+			const ci = checkInEl?.value;
+			const co = checkOutEl?.value;
+			if (!ci || !co) return;
+			msgEl.hidden = false;
+			msgEl.className = 'availability-msg';
+			msgEl.textContent = checkingLabel;
+			try {
+				const res = await fetch(`/api/booking/check-availability?roomId=${roomId}&checkIn=${ci}&checkOut=${co}`);
+				const data = await res.json();
+				msgEl.textContent = data.available ? availableLabel : notAvailableLabel;
+				msgEl.className = 'availability-msg ' + (data.available ? 'is-ok' : 'is-bad');
+			} catch {
+				msgEl.hidden = true;
+			}
+		});
+	</script>
+
+	<style>
+		.booking-page {
+			background: var(--bg-light);
+			min-height: 70vh;
+			padding: 2.5rem 0 4rem;
+		}
+
+		.container {
+			max-width: 64rem;
+			margin: 0 auto;
+			padding: 0 1.25rem;
+		}
+
+		.back-link {
+			display: inline-block;
+			margin-bottom: 1.25rem;
+			font-size: 0.85rem;
+			font-weight: 600;
+			color: var(--text-dark-muted);
+			text-decoration: none;
+		}
+
+		.back-link:hover {
+			color: var(--accent);
+		}
+
+		.booking-layout {
+			display: grid;
+			grid-template-columns: 1fr 20rem;
+			gap: 2rem;
+			align-items: start;
+		}
+
+		h1 {
+			margin: 0 0 0.3rem;
+			font-size: clamp(1.5rem, 4vw, 2rem);
+			font-weight: 800;
+		}
+
+		.subtitle {
+			margin: 0 0 1.5rem;
+			color: var(--text-dark-muted);
+			font-size: 0.92rem;
+		}
+
+		.login-hint {
+			background: rgba(0, 114, 206, 0.06);
+			border: 1px solid rgba(0, 114, 206, 0.2);
+			border-radius: 0.6rem;
+			padding: 0.7rem 0.9rem;
+			margin-bottom: 1.25rem;
+			font-size: 0.85rem;
+		}
+
+		.form-error {
+			background: rgba(234, 67, 53, 0.1);
+			color: #c0392b;
+			border: 1px solid rgba(234, 67, 53, 0.3);
+			border-radius: 0.6rem;
+			padding: 0.75rem 1rem;
+			margin-bottom: 1.25rem;
+			font-size: 0.9rem;
+		}
+
+		.booking-form {
+			display: flex;
+			flex-direction: column;
+			gap: 1.1rem;
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 1rem;
+			padding: 1.5rem;
+		}
+
+		.booking-form label {
+			display: flex;
+			flex-direction: column;
+			gap: 0.35rem;
+			font-size: 0.85rem;
+			font-weight: 600;
+			color: var(--text-dark);
+		}
+
+		.booking-form input[type='text'],
+		.booking-form input[type='email'],
+		.booking-form input[type='date'],
+		.booking-form input[type='number'],
+		.booking-form textarea {
+			font: inherit;
+			font-weight: 400;
+			padding: 0.6rem 0.75rem;
+			border-radius: 0.5rem;
+			border: 1px solid var(--border-light);
+			background: #fff;
+			color: var(--text-dark);
+			resize: vertical;
+		}
+
+		.field-row {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 1rem;
+		}
+
+		.section-heading {
+			margin: 0.4rem 0 0;
+			font-size: 1rem;
+			font-weight: 700;
+		}
+
+		hr {
+			border: none;
+			border-top: 1px solid var(--border-light);
+			margin: 0.2rem 0;
+		}
+
+		.btn {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			padding: 0.75rem 1.2rem;
+			border-radius: 0.6rem;
+			font-weight: 700;
+			font-size: 0.9rem;
+			font-family: inherit;
+			border: none;
+			cursor: pointer;
+			text-decoration: none;
+		}
+
+		.btn--check {
+			background: rgba(0, 114, 206, 0.1);
+			color: var(--accent);
+		}
+
+		.btn--check:hover {
+			background: rgba(0, 114, 206, 0.18);
+		}
+
+		.btn--primary-dark {
+			background: var(--text-dark);
+			color: var(--bg-light);
+			margin-top: 0.4rem;
+		}
+
+		.btn--primary-dark:hover {
+			filter: brightness(1.2);
+		}
+
+		.availability-msg {
+			margin: -0.5rem 0 0;
+			font-size: 0.85rem;
+			font-weight: 600;
+		}
+
+		.availability-msg.is-ok {
+			color: #2e7d4f;
+		}
+
+		.availability-msg.is-bad {
+			color: #c0392b;
+		}
+
+		.payment-options {
+			display: flex;
+			flex-direction: column;
+			gap: 0.6rem;
+		}
+
+		.payment-option {
+			flex-direction: row !important;
+			align-items: center;
+			gap: 0.7rem;
+			border: 1px solid var(--border-light);
+			border-radius: 0.6rem;
+			padding: 0.7rem 0.9rem;
+			cursor: pointer;
+		}
+
+		.payment-option span {
+			display: flex;
+			flex-direction: column;
+			gap: 0.1rem;
+		}
+
+		.payment-option small {
+			font-weight: 400;
+			color: var(--text-dark-muted);
+		}
+
+		.checkbox-row {
+			flex-direction: row;
+			align-items: flex-start;
+			gap: 0.5rem;
+			font-weight: 400 !important;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+		}
+
+		.checkbox-row input {
+			margin-top: 0.2rem;
+		}
+
+		.summary-card {
+			position: sticky;
+			top: 1.5rem;
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 1rem;
+			padding: 1.25rem;
+		}
+
+		.summary-card__img {
+			width: 100%;
+			aspect-ratio: 4 / 3;
+			object-fit: cover;
+			border-radius: 0.6rem;
+			margin-bottom: 0.8rem;
+		}
+
+		.summary-card h3 {
+			margin: 0 0 0.3rem;
+			font-size: 1.05rem;
+		}
+
+		.summary-meta {
+			margin: 0 0 0.8rem;
+			font-size: 0.82rem;
+			color: var(--text-dark-muted);
+		}
+
+		.summary-row {
+			padding-top: 0.6rem;
+			border-top: 1px solid var(--border-light);
+			font-size: 0.88rem;
+		}
+
+		.summary-row--total {
+			display: flex;
+			flex-direction: column;
+			gap: 0.15rem;
+		}
+
+		@media (max-width: 760px) {
+			.booking-layout {
+				grid-template-columns: 1fr;
+			}
+
+			.field-row {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+</BaseLayout>

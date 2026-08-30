@@ -13,7 +13,7 @@ export function isAdminLocale(value: string | undefined | null): value is AdminL
 }
 
 export interface AdminCopy {
-	nav: { overview: string; rooms: string; guests: string; logout: string; brand: string; brandSub: string };
+	nav: { overview: string; rooms: string; bookings: string; guests: string; logout: string; brand: string; brandSub: string };
 	login: { title: string; subtitle: string; email: string; password: string; submit: string; errorInvalid: string };
 	overview: {
 		title: string;
@@ -119,6 +119,8 @@ export interface AdminCopy {
 		priceWeek: string;
 		priceTwoWeeks: string;
 		pricePerMonth: string;
+		quantity: string;
+		quantityHint: string;
 		nameField: string;
 		bedsField: string;
 		bedsPlaceholder: string;
@@ -138,11 +140,63 @@ export interface AdminCopy {
 		errorRequired: string;
 		errorSlugTaken: string;
 	};
+	bookings: {
+		title: string;
+		subtitle: string;
+		empty: string;
+		colId: string;
+		colRoom: string;
+		colGuest: string;
+		colDates: string;
+		colTotal: string;
+		colStatus: string;
+		colPayment: string;
+		filterAll: string;
+		statusPending: string;
+		statusConfirmed: string;
+		statusCancelled: string;
+		statusCompleted: string;
+		paymentUnpaid: string;
+		paymentPaid: string;
+		paymentRefunded: string;
+	};
+	bookingDetail: {
+		back: string;
+		refLabel: string;
+		guestSection: string;
+		fullName: string;
+		email: string;
+		phone: string;
+		linkedAccount: string;
+		guestBooking: string;
+		staySection: string;
+		checkIn: string;
+		checkOut: string;
+		nights: string;
+		guestsCount: string;
+		specialRequests: string;
+		paymentSection: string;
+		method: string;
+		methodCash: string;
+		methodRevolut: string;
+		status: string;
+		pricePerNight: string;
+		total: string;
+		markPaid: string;
+		statusSection: string;
+		setPending: string;
+		setConfirmed: string;
+		setCancelled: string;
+		setCompleted: string;
+		completedHint: string;
+		pointsAwarded: string;
+		notice: string;
+	};
 }
 
 export const admin: Record<AdminLocale, AdminCopy> = {
 	uk: {
-		nav: { overview: 'Огляд', rooms: 'Номери', guests: 'Гості', logout: 'Вийти', brand: 'Hostel 3A', brandSub: 'Адмін-панель' },
+		nav: { overview: 'Огляд', rooms: 'Номери', bookings: 'Бронювання', guests: 'Гості', logout: 'Вийти', brand: 'Hostel 3A', brandSub: 'Адмін-панель' },
 		login: {
 			title: 'Адмін-панель',
 			subtitle: 'Hostel & Hotel Apartments',
@@ -255,6 +309,8 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			priceWeek: "Ціна/тиждень (€, необов'язково)",
 			priceTwoWeeks: "Ціна/2 тижні (€, необов'язково)",
 			pricePerMonth: "Ціна/місяць (€, необов'язково)",
+			quantity: 'Кількість одиниць',
+			quantityHint: 'Скільки таких номерів/ліжок фізично є — визначає, скільки бронювань на ці ж дати можливо одночасно.',
 			nameField: 'Назва номера',
 			bedsField: 'Ліжка',
 			bedsPlaceholder: 'напр. 1 double bed',
@@ -274,9 +330,61 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			errorRequired: 'Заповніть slug, назву англійською і ціну за ніч.',
 			errorSlugTaken: 'Такий slug вже використовується іншим номером.',
 		},
+		bookings: {
+			title: 'Бронювання',
+			subtitle: 'Власний календар бронювань сайту (без синхронізації з Booking.com чи іншими каналами).',
+			empty: 'Ще немає жодного бронювання.',
+			colId: '№',
+			colRoom: 'Номер',
+			colGuest: 'Гість',
+			colDates: 'Дати',
+			colTotal: 'Сума',
+			colStatus: 'Статус',
+			colPayment: 'Оплата',
+			filterAll: 'Усі',
+			statusPending: 'Очікує',
+			statusConfirmed: 'Підтверджено',
+			statusCancelled: 'Скасовано',
+			statusCompleted: 'Завершено',
+			paymentUnpaid: 'Не оплачено',
+			paymentPaid: 'Оплачено',
+			paymentRefunded: 'Повернено',
+		},
+		bookingDetail: {
+			back: '← Усі бронювання',
+			refLabel: 'Бронювання',
+			guestSection: 'Гість',
+			fullName: "Ім'я",
+			email: 'Email',
+			phone: 'Телефон',
+			linkedAccount: 'Прив\'язаний акаунт',
+			guestBooking: 'Без акаунта (гостьове бронювання)',
+			staySection: 'Проживання',
+			checkIn: 'Заїзд',
+			checkOut: 'Виїзд',
+			nights: 'Ночей',
+			guestsCount: 'Гостей',
+			specialRequests: 'Побажання',
+			paymentSection: 'Оплата',
+			method: 'Метод',
+			methodCash: 'На місці',
+			methodRevolut: 'Revolut',
+			status: 'Статус оплати',
+			pricePerNight: 'Ціна/ніч (з ПДВ)',
+			total: 'Разом',
+			markPaid: 'Позначити оплаченим',
+			statusSection: 'Статус бронювання',
+			setPending: 'Очікує',
+			setConfirmed: 'Підтвердити',
+			setCancelled: 'Скасувати',
+			setCompleted: 'Завершити проживання',
+			completedHint: 'При завершенні гостю з акаунтом автоматично нарахуються бали лояльності.',
+			pointsAwarded: 'Бали вже нараховано за це бронювання.',
+			notice: 'Збережено.',
+		},
 	},
 	ru: {
-		nav: { overview: 'Обзор', rooms: 'Номера', guests: 'Гости', logout: 'Выйти', brand: 'Hostel 3A', brandSub: 'Админ-панель' },
+		nav: { overview: 'Обзор', rooms: 'Номера', bookings: 'Бронирования', guests: 'Гости', logout: 'Выйти', brand: 'Hostel 3A', brandSub: 'Админ-панель' },
 		login: {
 			title: 'Админ-панель',
 			subtitle: 'Hostel & Hotel Apartments',
@@ -389,6 +497,8 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			priceWeek: 'Цена/неделя (€, необязательно)',
 			priceTwoWeeks: 'Цена/2 недели (€, необязательно)',
 			pricePerMonth: 'Цена/месяц (€, необязательно)',
+			quantity: 'Количество единиц',
+			quantityHint: 'Сколько таких номеров/кроватей физически есть — определяет, сколько бронирований на эти же даты возможно одновременно.',
 			nameField: 'Название номера',
 			bedsField: 'Кровати',
 			bedsPlaceholder: 'напр. 1 double bed',
@@ -407,6 +517,58 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			savedNotice: 'Сохранено.',
 			errorRequired: 'Заполните slug, название на английском и цену за ночь.',
 			errorSlugTaken: 'Такой slug уже используется другим номером.',
+		},
+		bookings: {
+			title: 'Бронирования',
+			subtitle: 'Собственный календарь бронирований сайта (без синхронизации с Booking.com и другими каналами).',
+			empty: 'Ещё нет ни одного бронирования.',
+			colId: '№',
+			colRoom: 'Номер',
+			colGuest: 'Гость',
+			colDates: 'Даты',
+			colTotal: 'Сумма',
+			colStatus: 'Статус',
+			colPayment: 'Оплата',
+			filterAll: 'Все',
+			statusPending: 'Ожидает',
+			statusConfirmed: 'Подтверждено',
+			statusCancelled: 'Отменено',
+			statusCompleted: 'Завершено',
+			paymentUnpaid: 'Не оплачено',
+			paymentPaid: 'Оплачено',
+			paymentRefunded: 'Возвращено',
+		},
+		bookingDetail: {
+			back: '← Все бронирования',
+			refLabel: 'Бронирование',
+			guestSection: 'Гость',
+			fullName: 'Имя',
+			email: 'Email',
+			phone: 'Телефон',
+			linkedAccount: 'Привязанный аккаунт',
+			guestBooking: 'Без аккаунта (гостевое бронирование)',
+			staySection: 'Проживание',
+			checkIn: 'Заезд',
+			checkOut: 'Выезд',
+			nights: 'Ночей',
+			guestsCount: 'Гостей',
+			specialRequests: 'Пожелания',
+			paymentSection: 'Оплата',
+			method: 'Метод',
+			methodCash: 'На месте',
+			methodRevolut: 'Revolut',
+			status: 'Статус оплаты',
+			pricePerNight: 'Цена/ночь (с НДС)',
+			total: 'Итого',
+			markPaid: 'Отметить оплаченным',
+			statusSection: 'Статус бронирования',
+			setPending: 'Ожидает',
+			setConfirmed: 'Подтвердить',
+			setCancelled: 'Отменить',
+			setCompleted: 'Завершить проживание',
+			completedHint: 'При завершении гостю с аккаунтом автоматически начислятся баллы лояльности.',
+			pointsAwarded: 'Баллы уже начислены за это бронирование.',
+			notice: 'Сохранено.',
 		},
 	},
 };

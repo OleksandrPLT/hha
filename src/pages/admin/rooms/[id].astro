@@ -65,6 +65,7 @@ if (Astro.request.method === 'POST') {
 		const priceWeekCents = eurosToCents(String(form.get('priceWeek') || ''));
 		const priceTwoWeeksCents = eurosToCents(String(form.get('priceTwoWeeks') || ''));
 		const pricePerMonthCents = eurosToCents(String(form.get('pricePerMonth') || ''));
+		const quantity = Math.max(1, Number(form.get('quantity')) || 1);
 
 		const titles: Record<string, string> = {};
 		const beds: Record<string, string> = {};
@@ -92,6 +93,7 @@ if (Astro.request.method === 'POST') {
 						priceWeekCents,
 						priceTwoWeeksCents,
 						pricePerMonthCents,
+						quantity,
 						titles: JSON.stringify(titles),
 						beds: JSON.stringify(beds),
 						guests: JSON.stringify(guests),
@@ -106,6 +108,7 @@ if (Astro.request.method === 'POST') {
 						priceWeekCents,
 						priceTwoWeeksCents,
 						pricePerMonthCents,
+						quantity,
 						titles: JSON.stringify(titles),
 						beds: JSON.stringify(beds),
 						guests: JSON.stringify(guests),
@@ -198,6 +201,12 @@ function centsToEuros(cents: number | null | undefined): string {
 						<input type="number" step="0.01" name="pricePerMonth" value={centsToEuros(room?.pricePerMonthCents)} />
 					</label>
 				</div>
+
+				<label>
+					{copy.quantity}
+					<input type="number" step="1" min="1" name="quantity" value={room?.quantity ?? 1} />
+				</label>
+				<p class="photo-hint">{copy.quantityHint}</p>
 
 				<div class="locale-tabs">
 					<div class="locale-tabs__nav" role="tablist">

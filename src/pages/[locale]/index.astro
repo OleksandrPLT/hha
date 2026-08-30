@@ -149,7 +149,7 @@ const schema = {
 				<h1>{copy.hero.heading}</h1>
 				<p class="hero__subheading">{copy.hero.subheading}</p>
 				<div class="hero__actions">
-					<a class="btn btn--primary" href={property.bookingUrl} target="_blank" rel="noopener noreferrer">{copy.hero.ctaBook}</a>
+					<a class="btn btn--primary" href="#rooms">{copy.hero.ctaBook}</a>
 					<a class="btn btn--ghost" href="#contact">{copy.hero.ctaContact}</a>
 				</div>
 			</div>
@@ -232,7 +232,7 @@ const schema = {
 											{copy.pricing.vatIncluded} {currency}
 											{withVat(room.rate.perNight).toFixed(2)}
 										</p>
-										<a class="btn btn--primary" href={property.bookingUrl} target="_blank" rel="noopener noreferrer">
+										<a class="btn btn--primary" href={`/${locale}/book/${room.slug}`}>
 											{copy.hero.ctaBook}
 										</a>
 									</div>

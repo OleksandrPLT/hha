@@ -142,6 +142,15 @@ export const rooms = sqliteTable('rooms', {
 	beds: text('beds').notNull(),
 	guests: text('guests').notNull(),
 
+	// Скільки фізичних одиниць цього типу можна бронювати одночасно
+	// (Фаза 4, ТЗ §5.4 — календар бронювань). Наприклад: 1 сімейний номер,
+	// але кілька окремих ліжок у спільній кімнаті — тоді quantity=4 і 4
+	// різні бронювання на ті самі дати не конфліктують, доки їх < quantity.
+	// За замовчуванням 1 (безпечне консервативне припущення) — РЕАЛЬНУ
+	// кількість по кожному номеру має виставити власник в адмінці, я не
+	// знаю фактичну кількість ліжок/кімнат кожного типу.
+	quantity: integer('quantity').notNull().default(1),
+
 	createdAt: text('created_at')
 		.notNull()
 		.default(sql`(current_timestamp)`),
@@ -167,3 +176,73 @@ export const roomPhotos = sqliteTable('room_photos', {
 
 export type RoomPhoto = typeof roomPhotos.$inferSelect;
 export type NewRoomPhoto = typeof roomPhotos.$inferInsert;
+
+// Бронювання (Фаза 4, ТЗ §5.4). Власний календар без синхронізації з
+// Booking.com (клієнт підтвердив 2026-08-29: доступу до Partner/Content
+// API ще нема — "почни з власного календаря без синхронізації"). Тому це
+// дублює лише ті ночі, що пройшли через наш власний віджет — overbooking
+// щодо зовнішніх каналів (Booking.com і т.д.) можливий і має вирішуватись
+// вручну адміном, поки немає реальної інтеграції.
+//
+// guestId — nullable: бронювання можливе без акаунта (guest checkout),
+// onDelete: 'set null' — видалення акаунта гостя НЕ видаляє історію
+// бронювань (потрібно для обліку/бухгалтерії), просто відв'язує запис.
+// fullName/email/phone продубльовані тут навіть коли guestId є — бронь
+// лишається самодостатньою навіть якщо акаунт гостя пізніше видалять.
+//
+// checkIn/checkOut — дати 'YYYY-MM-DD' (без часу; час заїзду/виїзду
+// фіксований політикою готелю: заїзд 10:00–22:00, виїзд — див. FAQ).
+//
+// pricePerNightCents — знімок ціни номера на момент бронювання (щоб
+// пізніша зміна ціни в адмінці не змінювала заднім числом вже оформлені
+// брони). totalCents v1 = nights × pricePerNightCents — тижневі/місячні
+// пакетні ціни (priceWeekCents і т.д.) поки НЕ застосовуються автоматично
+// до бронювання, це лише інформаційні "пакети" на лендінгу; коли дійде
+// платіжна інтеграція — можна додати автоматичний вибір найвигіднішого
+// тарифу.
+//
+// status: pending (очікує підтвердження адміном) | confirmed | cancelled
+// | completed (проживання завершилось — тригер для нарахування балів).
+// paymentStatus: unpaid | paid | refunded. paymentMethod: null, доки
+// гість не обрав на кроці оплати ('cash' | 'bank_transfer' | 'revolut' —
+// Revolut Pay ще не підключено, чекаємо Merchant API ключі).
+//
+// pointsAwarded — прапорець, щоб не нарахувати бали двічі, якщо адмін
+// випадково повторно позначить бронювання як completed.
+export const bookings = sqliteTable('bookings', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	roomId: integer('room_id')
+		.notNull()
+		.references(() => rooms.id),
+	guestId: integer('guest_id').references(() => guests.id, { onDelete: 'set null' }),
+
+	fullName: text('full_name').notNull(),
+	email: text('email').notNull(),
+	phone: text('phone').notNull(),
+
+	checkIn: text('check_in').notNull(),
+	checkOut: text('check_out').notNull(),
+	nights: integer('nights').notNull(),
+	guestsCount: integer('guests_count').notNull().default(1),
+
+	pricePerNightCents: integer('price_per_night_cents').notNull(),
+	totalCents: integer('total_cents').notNull(),
+
+	status: text('status').notNull().default('pending'),
+	paymentStatus: text('payment_status').notNull().default('unpaid'),
+	paymentMethod: text('payment_method'),
+	// Revolut Merchant API order id — для перевірки статусу оплати на
+	// сервері (GET /orders/{id}) перед тим, як довіряти client-side onSuccess.
+	paymentRef: text('payment_ref'),
+
+	specialRequests: text('special_requests'),
+
+	pointsAwarded: integer('points_awarded', { mode: 'boolean' }).notNull().default(false),
+
+	createdAt: text('created_at')
+		.notNull()
+		.default(sql`(current_timestamp)`),
+});
+
+export type Booking = typeof bookings.$inferSelect;
+export type NewBooking = typeof bookings.$inferInsert;
