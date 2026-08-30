@@ -7,7 +7,7 @@
 interface Props {
 	title: string;
 	adminName?: string;
-	activeNav?: 'overview' | 'guests';
+	activeNav?: 'overview' | 'guests' | 'rooms';
 }
 
 const { title, adminName, activeNav } = Astro.props;
@@ -200,6 +200,7 @@ const { title, adminName, activeNav } = Astro.props;
 				<nav>
 					<ul class="admin-nav">
 						<li><a href="/admin" class={activeNav === 'overview' ? 'is-active' : ''}>Огляд</a></li>
+						<li><a href="/admin/rooms" class={activeNav === 'rooms' ? 'is-active' : ''}>Номери</a></li>
 						<li><a href="/admin/guests" class={activeNav === 'guests' ? 'is-active' : ''}>Гості</a></li>
 					</ul>
 				</nav>

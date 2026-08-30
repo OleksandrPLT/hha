@@ -1,0 +1,259 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../db/client';
+import { admins, rooms, roomPhotos } from '../../../db/schema';
+import { eq, asc } from 'drizzle-orm';
+
+export const prerender = false;
+
+const adminId = await Astro.session?.get('adminId');
+if (!adminId) {
+	return Astro.redirect('/admin/login');
+}
+
+const admin = db.select().from(admins).where(eq(admins.id, adminId)).get();
+if (!admin) {
+	return Astro.redirect('/admin/login');
+}
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	const action = String(form.get('action') || '');
+	const roomId = Number(form.get('roomId'));
+
+	if (action === 'toggle-active' && Number.isInteger(roomId)) {
+		const room = db.select().from(rooms).where(eq(rooms.id, roomId)).get();
+		if (room) db.update(rooms).set({ isActive: !room.isActive }).where(eq(rooms.id, roomId)).run();
+	} else if ((action === 'move-up' || action === 'move-down') && Number.isInteger(roomId)) {
+		const all = db.select().from(rooms).orderBy(asc(rooms.sortOrder)).all();
+		const idx = all.findIndex((r) => r.id === roomId);
+		const swapWith = action === 'move-up' ? idx - 1 : idx + 1;
+		if (idx >= 0 && swapWith >= 0 && swapWith < all.length) {
+			const a = all[idx]!;
+			const b = all[swapWith]!;
+			db.update(rooms).set({ sortOrder: b.sortOrder }).where(eq(rooms.id, a.id)).run();
+			db.update(rooms).set({ sortOrder: a.sortOrder }).where(eq(rooms.id, b.id)).run();
+		}
+	}
+
+	return Astro.redirect('/admin/rooms');
+}
+
+const allRooms = db.select().from(rooms).orderBy(asc(rooms.sortOrder)).all();
+const photoCountByRoom = new Map<number, number>();
+for (const p of db.select().from(roomPhotos).all()) {
+	photoCountByRoom.set(p.roomId, (photoCountByRoom.get(p.roomId) ?? 0) + 1);
+}
+
+function titleFor(room: (typeof allRooms)[number]): string {
+	try {
+		const parsed = JSON.parse(room.titles) as Record<string, string>;
+		return parsed.en ?? room.slug;
+	} catch {
+		return room.slug;
+	}
+}
+
+function euro(cents: number | null): string {
+	if (cents == null) return '—';
+	return `€${(cents / 100).toFixed(2)}`;
+}
+---
+
+<AdminLayout title="Номери" adminName={admin.fullName} activeNav="rooms">
+	<div class="page-head">
+		<h1>Номери</h1>
+		<a href="/admin/rooms/new" class="btn-primary">+ Додати номер</a>
+	</div>
+	<p class="page-subtitle">Порядок тут визначає порядок карток на сайті. "Активний" — вимикає показ на лендінгу без видалення.</p>
+
+	{
+		allRooms.length === 0 ? (
+			<p class="empty-note">Ще немає жодного номера.</p>
+		) : (
+			<div class="table-wrap">
+				<table>
+					<thead>
+						<tr>
+							<th></th>
+							<th>Назва (EN)</th>
+							<th>Slug</th>
+							<th>Ціна/ніч</th>
+							<th>Фото</th>
+							<th>Статус</th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody>
+						{allRooms.map((room, i) => (
+							<tr>
+								<td class="order-cell">
+									<form method="POST">
+										<input type="hidden" name="action" value="move-up" />
+										<input type="hidden" name="roomId" value={room.id} />
+										<button type="submit" disabled={i === 0} aria-label="Вище">
+											↑
+										</button>
+									</form>
+									<form method="POST">
+										<input type="hidden" name="action" value="move-down" />
+										<input type="hidden" name="roomId" value={room.id} />
+										<button type="submit" disabled={i === allRooms.length - 1} aria-label="Нижче">
+											↓
+										</button>
+									</form>
+								</td>
+								<td><a href={`/admin/rooms/${room.id}`}>{titleFor(room)}</a></td>
+								<td class="mono">{room.slug}</td>
+								<td>{euro(room.pricePerNightCents)}</td>
+								<td>{photoCountByRoom.get(room.id) ?? 0}</td>
+								<td>
+									<form method="POST">
+										<input type="hidden" name="action" value="toggle-active" />
+										<input type="hidden" name="roomId" value={room.id} />
+										<button type="submit" class={room.isActive ? 'status-badge status-badge--active' : 'status-badge'}>
+											{room.isActive ? 'Активний' : 'Вимкнено'}
+										</button>
+									</form>
+								</td>
+								<td><a href={`/admin/rooms/${room.id}`} class="edit-link">Редагувати</a></td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+		)
+	}
+
+	<style>
+		.page-head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 0.4rem;
+		}
+
+		h1 {
+			margin: 0;
+			font-size: 1.4rem;
+			font-weight: 700;
+		}
+
+		.btn-primary {
+			height: 2.2rem;
+			padding: 0 1rem;
+			display: inline-flex;
+			align-items: center;
+			border-radius: 0.5rem;
+			background: var(--bg-dark);
+			color: var(--cream);
+			font-size: 0.82rem;
+			font-weight: 700;
+			text-decoration: none;
+		}
+
+		.page-subtitle {
+			margin: 0 0 1.25rem;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+			max-width: 40rem;
+		}
+
+		.empty-note {
+			color: var(--text-dark-muted);
+			font-size: 0.88rem;
+		}
+
+		.table-wrap {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			overflow-x: auto;
+		}
+
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 0.85rem;
+		}
+
+		th,
+		td {
+			text-align: left;
+			padding: 0.65rem 1rem;
+			white-space: nowrap;
+			vertical-align: middle;
+		}
+
+		.mono {
+			font-size: 0.78rem;
+			color: var(--text-dark-muted);
+		}
+
+		thead th {
+			font-size: 0.72rem;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			color: var(--text-dark-muted);
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		tbody tr:not(:last-child) td {
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		tbody a {
+			color: var(--accent);
+			font-weight: 600;
+			text-decoration: none;
+		}
+
+		tbody a:hover {
+			text-decoration: underline;
+		}
+
+		.order-cell {
+			display: flex;
+			gap: 0.2rem;
+		}
+
+		.order-cell form {
+			display: contents;
+		}
+
+		.order-cell button {
+			width: 1.6rem;
+			height: 1.6rem;
+			border: 1px solid var(--border-light);
+			background: #fff;
+			border-radius: 0.35rem;
+			cursor: pointer;
+			font-size: 0.8rem;
+		}
+
+		.order-cell button:disabled {
+			opacity: 0.3;
+			cursor: not-allowed;
+		}
+
+		.status-badge {
+			border: none;
+			border-radius: 999px;
+			padding: 0.25rem 0.7rem;
+			font-size: 0.72rem;
+			font-weight: 700;
+			cursor: pointer;
+			background: var(--border-light);
+			color: var(--text-dark-muted);
+		}
+
+		.status-badge--active {
+			background: rgba(63, 122, 79, 0.12);
+			color: var(--success);
+		}
+
+		.edit-link {
+			font-size: 0.8rem;
+		}
+	</style>
+</AdminLayout>

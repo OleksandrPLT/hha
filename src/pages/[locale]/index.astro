@@ -1,18 +1,16 @@
 ---
-// SSR глобально ввімкнено (Фаза 2+ потребує його), але ця сторінка суто
-// контентна — статика швидша й простіша, тож примусово prerender. (Під час
-// тех-режиму з паролем цей та інші prerender=true файли тимчасово
-// перемикаються на false скриптом scripts/build-maintenance.sh — Astro
-// вимагає, щоб сам export був статичним літералом, імпорт змінної сюди не
-// підходить, перевірено емпірично 2026-08-30.)
-export const prerender = true;
+// 2026-08-30: перейшло на SSR (раніше було prerender=true — статика,
+// швидше). Причина — Фаза 3 (адмін-кабінет): ціни/фото номерів тепер
+// керуються з /admin/rooms і мають з'являтись на сайті одразу, без
+// ручного перебілда. Рішення користувача: "Стати SSR (зміни з панелі
+// відразу)" замість "лишити статику, ребілдити вручну".
 import { Image } from 'astro:assets';
 import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import AmenityIcon from '../../components/AmenityIcon.astro';
-import { locales, htmlLang, type Locale } from '../../i18n/locales';
+import { isLocale, defaultLocale, htmlLang, type Locale } from '../../i18n/locales';
 import { landing } from '../../i18n/landing';
 import { amenities } from '../../i18n/amenities';
 import { newsCopy } from '../../i18n/news';
@@ -23,25 +21,23 @@ import { bookingCategoryLabels } from '../../i18n/booking-categories';
 import { faq } from '../../i18n/faq';
 import { nearby } from '../../data/nearby';
 import { nearbyCopy } from '../../i18n/nearby';
-import { amenityCategories, roomTypes } from '../../data/amenities';
+import { amenityCategories } from '../../data/amenities';
 import { property } from '../../data/property';
-import { currency, rates, withVat, savingsPercent } from '../../data/pricing';
+import { currency, withVat, savingsPercent } from '../../data/pricing';
+import { db } from '../../db/client';
+import { rooms, roomPhotos } from '../../db/schema';
+import { eq, asc } from 'drizzle-orm';
 
 import heroExterior from '../../assets/property/hero-exterior.jpg';
-import roomDouble from '../../assets/property/room-double.jpg';
-import roomTwinA from '../../assets/property/room-twin-a.jpg';
-import roomTwinB from '../../assets/property/room-twin-b.jpg';
-import roomDorm from '../../assets/property/room-dorm.jpg';
-import roomSingle from '../../assets/property/room-single.jpg';
 import lounge from '../../assets/property/lounge.jpg';
 import buffetTray from '../../assets/property/buffet-tray.jpg';
 import buffetDish from '../../assets/property/buffet-dish.jpg';
 
-export function getStaticPaths() {
-	return locales.map((locale) => ({ params: { locale } }));
+const rawLocale = Astro.params.locale;
+if (!rawLocale || !isLocale(rawLocale)) {
+	return Astro.redirect(`/${defaultLocale}`);
 }
-
-const { locale } = Astro.params as { locale: Locale };
+const locale: Locale = rawLocale;
 const copy = landing[locale];
 const amenitiesCopy = amenities[locale];
 const newsC = newsCopy[locale];
@@ -69,20 +65,55 @@ function newsSlugFor(id: string) {
 
 // Фото по типах номерів — ілюстративне зіставлення (реальні фото з об'єкта,
 // але не прив'язані 1:1 до конкретної кімнати з довідки клієнта).
-const roomPhotos: Record<string, ImageMetadata> = {
-	family: roomDouble,
-	single: roomSingle,
-	dormBed: roomDorm,
-	triple: roomTwinA,
-	fourBed: roomTwinB,
-};
+// Номери — з /admin/rooms (Фаза 3), не хардкод. titles/beds/guests в БД —
+// JSON {en,et,uk,ru,lv,fi}; беремо поточну locale з фолбеком на en, якщо
+// адмін ще не заповнив переклад для якоїсь мови.
+function parseLocaleJson(raw: string): Record<string, string> {
+	try {
+		return JSON.parse(raw) as Record<string, string>;
+	} catch {
+		return {};
+	}
+}
+function pickLocale(obj: Record<string, string>, loc: Locale): string {
+	return obj[loc] || obj.en || '';
+}
 
-const roomCards = roomTypes.map((room) => ({
-	...room,
-	...amenitiesCopy.rooms[room.id],
-	img: roomPhotos[room.id],
-	rate: rates[room.rateCategory],
-}));
+const activeRoomRows = db.select().from(rooms).where(eq(rooms.isActive, true)).orderBy(asc(rooms.sortOrder)).all();
+const allRoomPhotos = db.select().from(roomPhotos).orderBy(asc(roomPhotos.sortOrder)).all();
+const photosByRoomId = new Map<number, string[]>();
+for (const p of allRoomPhotos) {
+	const arr = photosByRoomId.get(p.roomId) ?? [];
+	arr.push(p.photoUrl);
+	photosByRoomId.set(p.roomId, arr);
+}
+
+const roomCards = activeRoomRows.map((room) => {
+	const titles = parseLocaleJson(room.titles);
+	const bedsObj = parseLocaleJson(room.beds);
+	const guestsObj = parseLocaleJson(room.guests);
+	const photos = photosByRoomId.get(room.id) ?? [];
+	return {
+		id: room.id,
+		slug: room.slug,
+		title: pickLocale(titles, locale),
+		beds: pickLocale(bedsObj, locale),
+		guests: pickLocale(guestsObj, locale),
+		photoUrl: photos[0] ?? null,
+		rate: { perNight: room.pricePerNightCents / 100 },
+	};
+});
+
+const packageRooms = activeRoomRows
+	.filter((r) => r.priceWeekCents != null && r.priceTwoWeeksCents != null && r.pricePerMonthCents != null)
+	.map((r) => ({
+		slug: r.slug,
+		label: pickLocale(parseLocaleJson(r.titles), locale),
+		perNight: r.pricePerNightCents / 100,
+		week: r.priceWeekCents! / 100,
+		twoWeeks: r.priceTwoWeeksCents! / 100,
+		perMonth: r.pricePerMonthCents! / 100,
+	}));
 
 const schema = {
 	'@context': 'https://schema.org',
@@ -150,7 +181,7 @@ const schema = {
 						roomCards.map((room, i) => (
 							<article class="room-card" data-room-index={i} role="button" tabindex="0" aria-haspopup="dialog" aria-label={room.title}>
 								<div class="room-card__img">
-									<Image src={room.img} alt={room.title} width={700} loading="lazy" />
+									{room.photoUrl ? <img src={room.photoUrl} alt={room.title} loading="lazy" /> : <div class="room-card__img-placeholder" aria-hidden="true" />}
 								</div>
 								<h3>{room.title}</h3>
 								<p class="room-card__meta">
@@ -183,7 +214,7 @@ const schema = {
 							roomCards.map((room, i) => (
 								<div class="room-modal__panel" data-room-panel={i} hidden>
 									<div class="room-modal__img">
-										<Image src={room.img} alt={room.title} width={1100} loading="lazy" />
+										{room.photoUrl ? <img src={room.photoUrl} alt={room.title} loading="lazy" /> : <div class="room-card__img-placeholder" aria-hidden="true" />}
 									</div>
 									<div class="room-modal__body">
 										<h3 id={`room-modal-title-${i}`}>{room.title}</h3>
@@ -213,53 +244,45 @@ const schema = {
 
 				<p class="rooms-vat-note">{copy.pricing.vatExcluded}</p>
 
-				<!-- Пакетні тарифи (тиждень / 2 тижні / місяць) — за категоріями, не за
-				     кожним типом номера окремо (обидва "shared"-типи номерів мають
-				     однакову ціну на цій категорії). -->
+				<!-- Пакетні тарифи (тиждень / 2 тижні / місяць) — лише для номерів, де
+				     адмін заповнив пакетні ціни (не всі номери їх мають, напр.
+				     triple/fourBed — тільки подобово). -->
 				<div class="package-grid">
 					{
-						(
-							[
-								['shared', copy.pricing.categoryShared],
-								['family', copy.pricing.categoryFamily],
-							] as const
-						).map(([key, label]) => {
-							const rate = rates[key];
-							return (
-								<div class="package-card">
-									<h3>{label}</h3>
-									<dl>
-										<div>
-											<dt>{copy.pricing.colPerMonth}</dt>
-											<dd>
-												{currency}
-												{rate.perMonth.toFixed(2)}
-											</dd>
-										</div>
-										<div>
-											<dt>{copy.pricing.colWeek}</dt>
-											<dd>
-												{currency}
-												{rate.week.toFixed(2)}
-												<span class="package-save">
-													{copy.pricing.save} {savingsPercent(rate.perNight, rate.week, 7)}%
-												</span>
-											</dd>
-										</div>
-										<div>
-											<dt>{copy.pricing.colTwoWeeks}</dt>
-											<dd>
-												{currency}
-												{rate.twoWeeks.toFixed(2)}
-												<span class="package-save">
-													{copy.pricing.save} {savingsPercent(rate.perNight, rate.twoWeeks, 14)}%
-												</span>
-											</dd>
-										</div>
-									</dl>
-								</div>
-							);
-						})
+						packageRooms.map((room) => (
+							<div class="package-card">
+								<h3>{room.label}</h3>
+								<dl>
+									<div>
+										<dt>{copy.pricing.colPerMonth}</dt>
+										<dd>
+											{currency}
+											{room.perMonth.toFixed(2)}
+										</dd>
+									</div>
+									<div>
+										<dt>{copy.pricing.colWeek}</dt>
+										<dd>
+											{currency}
+											{room.week.toFixed(2)}
+											<span class="package-save">
+												{copy.pricing.save} {savingsPercent(room.perNight, room.week, 7)}%
+											</span>
+										</dd>
+									</div>
+									<div>
+										<dt>{copy.pricing.colTwoWeeks}</dt>
+										<dd>
+											{currency}
+											{room.twoWeeks.toFixed(2)}
+											<span class="package-save">
+												{copy.pricing.save} {savingsPercent(room.perNight, room.twoWeeks, 14)}%
+											</span>
+										</dd>
+									</div>
+								</dl>
+							</div>
+						))
 					}
 				</div>
 
@@ -934,6 +957,12 @@ const schema = {
 			height: 100%;
 			object-fit: cover;
 			display: block;
+		}
+
+		.room-card__img-placeholder {
+			width: 100%;
+			height: 100%;
+			background: var(--surface-dark-2);
 		}
 
 		.room-card h3 {

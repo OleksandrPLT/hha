@@ -1,0 +1,584 @@
+---
+// Створення/редагування номера. id === 'new' -> порожня форма (INSERT),
+// інакше редагування існуючого (UPDATE). Один файл замість двох — форма
+// ідентична, різниться лише SQL-операцією.
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../db/client';
+import { admins, rooms, roomPhotos } from '../../../db/schema';
+import { eq, asc, sql as sqlOp } from 'drizzle-orm';
+import { locales, localeNames } from '../../../i18n/locales';
+
+export const prerender = false;
+
+const adminId = await Astro.session?.get('adminId');
+if (!adminId) {
+	return Astro.redirect('/admin/login');
+}
+
+const admin = db.select().from(admins).where(eq(admins.id, adminId)).get();
+if (!admin) {
+	return Astro.redirect('/admin/login');
+}
+
+const rawId = Astro.params.id;
+const isNew = rawId === 'new';
+const roomId = isNew ? null : Number(rawId);
+
+if (!isNew && !Number.isInteger(roomId)) {
+	return Astro.redirect('/admin/rooms');
+}
+
+let room = isNew ? null : db.select().from(rooms).where(eq(rooms.id, roomId!)).get();
+if (!isNew && !room) {
+	return Astro.redirect('/admin/rooms');
+}
+
+let error = '';
+
+function parseLocaleJson(raw: string | undefined): Record<string, string> {
+	if (!raw) return {};
+	try {
+		return JSON.parse(raw) as Record<string, string>;
+	} catch {
+		return {};
+	}
+}
+
+function eurosToCents(raw: string): number | null {
+	const v = raw.trim();
+	if (!v) return null;
+	const n = Math.round(parseFloat(v) * 100);
+	return Number.isFinite(n) ? n : null;
+}
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	const action = String(form.get('action') || 'save');
+
+	if (action === 'save') {
+		const slug = String(form.get('slug') || '').trim();
+		const pricePerNightCents = eurosToCents(String(form.get('pricePerNight') || ''));
+		const priceWeekCents = eurosToCents(String(form.get('priceWeek') || ''));
+		const priceTwoWeeksCents = eurosToCents(String(form.get('priceTwoWeeks') || ''));
+		const pricePerMonthCents = eurosToCents(String(form.get('pricePerMonth') || ''));
+
+		const titles: Record<string, string> = {};
+		const beds: Record<string, string> = {};
+		const guests: Record<string, string> = {};
+		for (const l of locales) {
+			titles[l] = String(form.get(`title_${l}`) || '').trim();
+			beds[l] = String(form.get(`beds_${l}`) || '').trim();
+			guests[l] = String(form.get(`guests_${l}`) || '').trim();
+		}
+
+		if (!slug || !titles.en || pricePerNightCents == null) {
+			error = "Заповніть slug, назву англійською і ціну за ніч.";
+		} else {
+			const existingSlug = db.select().from(rooms).where(eq(rooms.slug, slug)).get();
+			if (existingSlug && existingSlug.id !== roomId) {
+				error = 'Такий slug вже використовується іншим номером.';
+			} else if (isNew) {
+				const maxOrder = db.select({ max: sqlOp<number>`max(sort_order)` }).from(rooms).get();
+				const inserted = db
+					.insert(rooms)
+					.values({
+						slug,
+						sortOrder: (maxOrder?.max ?? -1) + 1,
+						pricePerNightCents,
+						priceWeekCents,
+						priceTwoWeeksCents,
+						pricePerMonthCents,
+						titles: JSON.stringify(titles),
+						beds: JSON.stringify(beds),
+						guests: JSON.stringify(guests),
+					})
+					.run();
+				return Astro.redirect(`/admin/rooms/${inserted.lastInsertRowid}`);
+			} else {
+				db.update(rooms)
+					.set({
+						slug,
+						pricePerNightCents,
+						priceWeekCents,
+						priceTwoWeeksCents,
+						pricePerMonthCents,
+						titles: JSON.stringify(titles),
+						beds: JSON.stringify(beds),
+						guests: JSON.stringify(guests),
+					})
+					.where(eq(rooms.id, roomId!))
+					.run();
+				return Astro.redirect(`/admin/rooms/${roomId}?updated=1`);
+			}
+		}
+	} else if (action === 'delete-room' && !isNew) {
+		db.delete(rooms).where(eq(rooms.id, roomId!)).run();
+		return Astro.redirect('/admin/rooms');
+	} else if (action === 'add-photo' && !isNew) {
+		const photoUrl = String(form.get('photoUrl') || '');
+		if (photoUrl) {
+			const maxOrder = db.select({ max: sqlOp<number>`max(sort_order)` }).from(roomPhotos).where(eq(roomPhotos.roomId, roomId!)).get();
+			db.insert(roomPhotos)
+				.values({ roomId: roomId!, photoUrl, sortOrder: (maxOrder?.max ?? -1) + 1 })
+				.run();
+		}
+		return Astro.redirect(`/admin/rooms/${roomId}`);
+	} else if (action === 'delete-photo' && !isNew) {
+		const photoId = Number(form.get('photoId'));
+		if (Number.isInteger(photoId)) db.delete(roomPhotos).where(eq(roomPhotos.id, photoId)).run();
+		return Astro.redirect(`/admin/rooms/${roomId}`);
+	} else if ((action === 'move-photo-up' || action === 'move-photo-down') && !isNew) {
+		const photoId = Number(form.get('photoId'));
+		const photos = db.select().from(roomPhotos).where(eq(roomPhotos.roomId, roomId!)).orderBy(asc(roomPhotos.sortOrder)).all();
+		const idx = photos.findIndex((p) => p.id === photoId);
+		const swapWith = action === 'move-photo-up' ? idx - 1 : idx + 1;
+		if (idx >= 0 && swapWith >= 0 && swapWith < photos.length) {
+			const a = photos[idx]!;
+			const b = photos[swapWith]!;
+			db.update(roomPhotos).set({ sortOrder: b.sortOrder }).where(eq(roomPhotos.id, a.id)).run();
+			db.update(roomPhotos).set({ sortOrder: a.sortOrder }).where(eq(roomPhotos.id, b.id)).run();
+		}
+		return Astro.redirect(`/admin/rooms/${roomId}`);
+	}
+
+	room = isNew ? null : db.select().from(rooms).where(eq(rooms.id, roomId!)).get() ?? null;
+}
+
+const updatedNotice = Astro.url.searchParams.get('updated') === '1';
+
+const titles = parseLocaleJson(room?.titles);
+const beds = parseLocaleJson(room?.beds);
+const guests = parseLocaleJson(room?.guests);
+
+const photos = isNew ? [] : db.select().from(roomPhotos).where(eq(roomPhotos.roomId, roomId!)).orderBy(asc(roomPhotos.sortOrder)).all();
+
+function centsToEuros(cents: number | null | undefined): string {
+	return cents == null ? '' : (cents / 100).toFixed(2);
+}
+---
+
+<AdminLayout title={isNew ? 'Новий номер' : titles.en ?? room?.slug ?? 'Номер'} adminName={admin.fullName} activeNav="rooms">
+	<a href="/admin/rooms" class="back-link">← Усі номери</a>
+	<h1>{isNew ? 'Новий номер' : titles.en ?? room?.slug}</h1>
+
+	{updatedNotice && <p class="notice notice--success">Збережено.</p>}
+	{error && <p class="notice notice--error">{error}</p>}
+
+	<div class="grid-2">
+		<section class="card">
+			<h2>Основне</h2>
+			<form method="POST" class="room-form" id="room-form">
+				<input type="hidden" name="action" value="save" />
+				<label>
+					Slug (латиницею, унікальний)
+					<input type="text" name="slug" required value={room?.slug ?? ''} placeholder="напр. deluxe-double" />
+				</label>
+
+				<div class="field-row">
+					<label>
+						Ціна/ніч (€)
+						<input type="number" step="0.01" name="pricePerNight" required value={centsToEuros(room?.pricePerNightCents)} />
+					</label>
+					<label>
+						Ціна/тиждень (€, необов'язково)
+						<input type="number" step="0.01" name="priceWeek" value={centsToEuros(room?.priceWeekCents)} />
+					</label>
+				</div>
+				<div class="field-row">
+					<label>
+						Ціна/2 тижні (€, необов'язково)
+						<input type="number" step="0.01" name="priceTwoWeeks" value={centsToEuros(room?.priceTwoWeeksCents)} />
+					</label>
+					<label>
+						Ціна/місяць (€, необов'язково)
+						<input type="number" step="0.01" name="pricePerMonth" value={centsToEuros(room?.pricePerMonthCents)} />
+					</label>
+				</div>
+
+				<div class="locale-tabs">
+					<div class="locale-tabs__nav" role="tablist">
+						{locales.map((l, i) => (
+							<button type="button" class="locale-tab-btn" data-locale-tab={l} aria-selected={i === 0 ? 'true' : 'false'}>
+								{localeNames[l]}
+							</button>
+						))}
+					</div>
+					{locales.map((l, i) => (
+						<div class="locale-tab-panel" data-locale-panel={l} hidden={i !== 0}>
+							<label>
+								Назва номера
+								<input type="text" name={`title_${l}`} required={l === 'en'} value={titles[l] ?? ''} />
+							</label>
+							<label>
+								Ліжка
+								<input type="text" name={`beds_${l}`} value={beds[l] ?? ''} placeholder="напр. 1 double bed" />
+							</label>
+							<label>
+								Гостей
+								<input type="text" name={`guests_${l}`} value={guests[l] ?? ''} placeholder="напр. 2 guests" />
+							</label>
+						</div>
+					))}
+				</div>
+
+				<button type="submit" class="btn-primary">{isNew ? 'Створити номер' : 'Зберегти зміни'}</button>
+			</form>
+
+			{!isNew && (
+				<form method="POST" class="delete-room-form" onsubmit="return confirm('Видалити цей номер і всі його фото назавжди?')">
+					<input type="hidden" name="action" value="delete-room" />
+					<button type="submit" class="btn-danger-text">Видалити номер</button>
+				</form>
+			)}
+		</section>
+
+		<section class="card">
+			<h2>Фото</h2>
+			{isNew ? (
+				<p class="empty-note">Спершу створіть номер, потім можна буде додавати фото.</p>
+			) : (
+				<Fragment>
+					<label class="photo-upload-label">
+						Завантажити фото
+						<input type="file" id="photo-input" accept="image/*" hidden />
+					</label>
+					<p class="photo-hint">Перше фото в списку — те, що показується на картці номера на сайті.</p>
+
+					<form method="POST" id="add-photo-form" hidden>
+						<input type="hidden" name="action" value="add-photo" />
+						<input type="hidden" name="photoUrl" id="new-photo-url-field" />
+					</form>
+
+					{photos.length === 0 ? (
+						<p class="empty-note">Ще немає фото — використовується заглушка на сайті.</p>
+					) : (
+						<ul class="photo-list">
+							{photos.map((p, i) => (
+								<li>
+									<img src={p.photoUrl} alt="" />
+									<div class="photo-actions">
+										<form method="POST">
+											<input type="hidden" name="action" value="move-photo-up" />
+											<input type="hidden" name="photoId" value={p.id} />
+											<button type="submit" disabled={i === 0}>↑</button>
+										</form>
+										<form method="POST">
+											<input type="hidden" name="action" value="move-photo-down" />
+											<input type="hidden" name="photoId" value={p.id} />
+											<button type="submit" disabled={i === photos.length - 1}>↓</button>
+										</form>
+										<form method="POST">
+											<input type="hidden" name="action" value="delete-photo" />
+											<input type="hidden" name="photoId" value={p.id} />
+											<button type="submit" class="danger">Видалити</button>
+										</form>
+									</div>
+								</li>
+							))}
+						</ul>
+					)}
+				</Fragment>
+			)}
+		</section>
+	</div>
+
+	<script is:inline>
+		(function () {
+			var tabs = document.querySelectorAll('[data-locale-tab]');
+			tabs.forEach(function (btn) {
+				btn.addEventListener('click', function () {
+					var target = btn.dataset.localeTab;
+					document.querySelectorAll('[data-locale-tab]').forEach(function (b) {
+						b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+					});
+					document.querySelectorAll('[data-locale-panel]').forEach(function (p) {
+						p.hidden = p.dataset.localePanel !== target;
+					});
+				});
+			});
+		})();
+
+		(function () {
+			var input = document.getElementById('photo-input');
+			var hiddenField = document.getElementById('new-photo-url-field');
+			var form = document.getElementById('add-photo-form');
+			if (!input || !hiddenField || !form) return;
+
+			input.addEventListener('change', function () {
+				var file = input.files && input.files[0];
+				if (!file) return;
+
+				var img = new Image();
+				var reader = new FileReader();
+				reader.onload = function (e) {
+					img.onload = function () {
+						var maxDim = 1400;
+						var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+						var w = Math.round(img.width * scale);
+						var h = Math.round(img.height * scale);
+						var canvas = document.createElement('canvas');
+						canvas.width = w;
+						canvas.height = h;
+						var ctx = canvas.getContext('2d');
+						ctx.drawImage(img, 0, 0, w, h);
+						hiddenField.value = canvas.toDataURL('image/jpeg', 0.85);
+						form.submit();
+					};
+					img.src = String(e.target && e.target.result);
+				};
+				reader.readAsDataURL(file);
+			});
+		})();
+	</script>
+
+	<style>
+		.back-link {
+			display: inline-block;
+			margin-bottom: 0.75rem;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+			text-decoration: none;
+		}
+
+		.back-link:hover {
+			color: var(--text-dark);
+		}
+
+		h1 {
+			margin: 0 0 1.1rem;
+			font-size: 1.4rem;
+			font-weight: 700;
+		}
+
+		.notice {
+			border-radius: 0.6rem;
+			padding: 0.65rem 0.9rem;
+			margin-bottom: 1.1rem;
+			font-size: 0.85rem;
+		}
+
+		.notice--success {
+			background: rgba(63, 122, 79, 0.1);
+			color: var(--success);
+			border: 1px solid rgba(63, 122, 79, 0.3);
+		}
+
+		.notice--error {
+			background: rgba(234, 67, 53, 0.1);
+			color: #c0392b;
+			border: 1px solid rgba(234, 67, 53, 0.3);
+		}
+
+		.grid-2 {
+			display: grid;
+			grid-template-columns: 1.2fr 1fr;
+			gap: 1.25rem;
+			align-items: start;
+		}
+
+		.card {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			padding: 1.3rem 1.4rem;
+		}
+
+		.card h2 {
+			margin: 0 0 1rem;
+			font-size: 0.95rem;
+			font-weight: 700;
+		}
+
+		.room-form {
+			display: flex;
+			flex-direction: column;
+			gap: 0.9rem;
+		}
+
+		label {
+			display: flex;
+			flex-direction: column;
+			gap: 0.3rem;
+			font-size: 0.8rem;
+			font-weight: 600;
+			color: var(--text-dark);
+		}
+
+		input {
+			font: inherit;
+			font-weight: 400;
+			padding: 0.55rem 0.7rem;
+			border-radius: 0.5rem;
+			border: 1px solid var(--border-light);
+		}
+
+		.field-row {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 0.75rem;
+		}
+
+		.locale-tabs {
+			border: 1px solid var(--border-light);
+			border-radius: 0.6rem;
+			padding: 0.9rem;
+		}
+
+		.locale-tabs__nav {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.35rem;
+			margin-bottom: 0.9rem;
+		}
+
+		.locale-tab-btn {
+			font: inherit;
+			font-size: 0.76rem;
+			font-weight: 600;
+			padding: 0.35rem 0.7rem;
+			border-radius: 999px;
+			border: 1px solid var(--border-light);
+			background: #fff;
+			color: var(--text-dark-muted);
+			cursor: pointer;
+		}
+
+		.locale-tab-btn[aria-selected='true'] {
+			background: var(--bg-dark);
+			border-color: var(--bg-dark);
+			color: var(--cream);
+		}
+
+		.locale-tab-panel {
+			display: flex;
+			flex-direction: column;
+			gap: 0.7rem;
+		}
+
+		.btn-primary {
+			align-self: flex-start;
+			height: 2.3rem;
+			padding: 0 1.1rem;
+			border: none;
+			border-radius: 0.5rem;
+			background: var(--bg-dark);
+			color: var(--cream);
+			font-size: 0.82rem;
+			font-weight: 700;
+			cursor: pointer;
+			text-decoration: none;
+			display: inline-flex;
+			align-items: center;
+		}
+
+		.delete-room-form {
+			margin-top: 1rem;
+			padding-top: 1rem;
+			border-top: 1px solid var(--border-light);
+		}
+
+		.btn-danger-text {
+			background: none;
+			border: none;
+			color: var(--danger);
+			font-size: 0.8rem;
+			font-weight: 600;
+			cursor: pointer;
+			padding: 0;
+		}
+
+		.btn-danger-text:hover {
+			text-decoration: underline;
+		}
+
+		.photo-upload-label {
+			display: inline-flex;
+			align-items: center;
+			height: 2.2rem;
+			padding: 0 0.9rem;
+			border-radius: 0.5rem;
+			border: 1px solid var(--border-light);
+			background: #fff;
+			font-size: 0.8rem;
+			cursor: pointer;
+			margin-bottom: 0.4rem;
+		}
+
+		.photo-upload-label:hover {
+			border-color: var(--accent);
+			color: var(--accent);
+		}
+
+		.photo-hint {
+			margin: 0 0 1rem;
+			font-size: 0.76rem;
+			color: var(--text-dark-muted);
+		}
+
+		.empty-note {
+			font-size: 0.82rem;
+			color: var(--text-dark-muted);
+		}
+
+		.photo-list {
+			list-style: none;
+			margin: 0;
+			padding: 0;
+			display: flex;
+			flex-direction: column;
+			gap: 0.75rem;
+		}
+
+		.photo-list li {
+			display: flex;
+			gap: 0.8rem;
+			align-items: center;
+			border: 1px solid var(--border-light);
+			border-radius: 0.6rem;
+			padding: 0.5rem;
+		}
+
+		.photo-list img {
+			width: 5rem;
+			height: 3.5rem;
+			object-fit: cover;
+			border-radius: 0.4rem;
+			flex-shrink: 0;
+		}
+
+		.photo-actions {
+			display: flex;
+			gap: 0.35rem;
+		}
+
+		.photo-actions form {
+			display: contents;
+		}
+
+		.photo-actions button {
+			height: 1.9rem;
+			padding: 0 0.6rem;
+			border: 1px solid var(--border-light);
+			background: #fff;
+			border-radius: 0.4rem;
+			font-size: 0.76rem;
+			cursor: pointer;
+		}
+
+		.photo-actions button:disabled {
+			opacity: 0.3;
+			cursor: not-allowed;
+		}
+
+		.photo-actions button.danger {
+			color: var(--danger);
+			border-color: rgba(179, 67, 47, 0.3);
+		}
+
+		@media (max-width: 900px) {
+			.grid-2 {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+</AdminLayout>

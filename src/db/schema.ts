@@ -116,3 +116,54 @@ export const guestNotes = sqliteTable('guest_notes', {
 
 export type GuestNote = typeof guestNotes.$inferSelect;
 export type NewGuestNote = typeof guestNotes.$inferInsert;
+
+// Номери, керовані адміном (ТЗ §5.3 "управление номерами: описание, цены,
+// доступность"). Замінює хардкод в src/data/amenities.ts (roomTypes) +
+// src/data/pricing.ts (rates) + src/i18n/amenities.ts (rooms.*) —
+// landing.astro тепер читає звідси, а не з тих файлів (ті лишились як
+// джерело seed-даних при міграції, самі більше на сторінку не впливають).
+// titles/beds/guests — JSON-текст {en,et,uk,ru,lv,fi}, той самий набір
+// текстів, що раніше жив у i18n-файлі, просто тепер редагований з панелі.
+// isActive — вимкнути показ номера на сайті без видалення (проста форма
+// "доступності", без прив'язки до конкретних дат — та вимагає системи
+// бронювання, Фаза 4).
+export const rooms = sqliteTable('rooms', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	slug: text('slug').notNull().unique(),
+	sortOrder: integer('sort_order').notNull().default(0),
+	isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+
+	pricePerNightCents: integer('price_per_night_cents').notNull(),
+	priceWeekCents: integer('price_week_cents'),
+	priceTwoWeeksCents: integer('price_two_weeks_cents'),
+	pricePerMonthCents: integer('price_per_month_cents'),
+
+	titles: text('titles').notNull(),
+	beds: text('beds').notNull(),
+	guests: text('guests').notNull(),
+
+	createdAt: text('created_at')
+		.notNull()
+		.default(sql`(current_timestamp)`),
+});
+
+export type Room = typeof rooms.$inferSelect;
+export type NewRoom = typeof rooms.$inferInsert;
+
+// Фото номера — data URL (base64), той самий підхід, що й фото профілю
+// гостя (немає runtime-writable директорії, яку роздає Node standalone).
+// sortOrder=0 — те, що показується на картці номера на лендінгу.
+export const roomPhotos = sqliteTable('room_photos', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	roomId: integer('room_id')
+		.notNull()
+		.references(() => rooms.id, { onDelete: 'cascade' }),
+	photoUrl: text('photo_url').notNull(),
+	sortOrder: integer('sort_order').notNull().default(0),
+	createdAt: text('created_at')
+		.notNull()
+		.default(sql`(current_timestamp)`),
+});
+
+export type RoomPhoto = typeof roomPhotos.$inferSelect;
+export type NewRoomPhoto = typeof roomPhotos.$inferInsert;
