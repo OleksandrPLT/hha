@@ -1,20 +1,40 @@
 ---
+// SSR глобально ввімкнено (Фаза 2+ потребує його), але ця сторінка суто
+// контентна — статика швидша й простіша, тож примусово prerender. (Під час
+// тех-режиму з паролем цей та інші prerender=true файли тимчасово
+// перемикаються на false скриптом scripts/build-maintenance.sh — Astro
+// вимагає, щоб сам export був статичним літералом, імпорт змінної сюди не
+// підходить, перевірено емпірично 2026-08-30.)
+export const prerender = true;
 import { Image } from 'astro:assets';
+import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import LanguageModal from '../../components/LanguageModal.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
+import AmenityIcon from '../../components/AmenityIcon.astro';
 import { locales, htmlLang, type Locale } from '../../i18n/locales';
 import { landing } from '../../i18n/landing';
+import { amenities } from '../../i18n/amenities';
+import { newsCopy } from '../../i18n/news';
+import { newsImages } from '../../data/news-images';
+import { guestReviews } from '../../data/guest-reviews';
+import { bookingCategoryScores } from '../../data/booking-categories';
+import { bookingCategoryLabels } from '../../i18n/booking-categories';
+import { faq } from '../../i18n/faq';
+import { nearby } from '../../data/nearby';
+import { nearbyCopy } from '../../i18n/nearby';
+import { amenityCategories, roomTypes } from '../../data/amenities';
 import { property } from '../../data/property';
+import { currency, rates, withVat, savingsPercent } from '../../data/pricing';
 
 import heroExterior from '../../assets/property/hero-exterior.jpg';
 import roomDouble from '../../assets/property/room-double.jpg';
 import roomTwinA from '../../assets/property/room-twin-a.jpg';
+import roomTwinB from '../../assets/property/room-twin-b.jpg';
 import roomDorm from '../../assets/property/room-dorm.jpg';
 import roomSingle from '../../assets/property/room-single.jpg';
 import lounge from '../../assets/property/lounge.jpg';
-import dining from '../../assets/property/dining.jpg';
 import buffetTray from '../../assets/property/buffet-tray.jpg';
 import buffetDish from '../../assets/property/buffet-dish.jpg';
 
@@ -24,7 +44,46 @@ export function getStaticPaths() {
 
 const { locale } = Astro.params as { locale: Locale };
 const copy = landing[locale];
-const title = `H&H apartments — ${property.propertyName}, ${property.city}`;
+const amenitiesCopy = amenities[locale];
+const newsC = newsCopy[locale];
+const categoryLabels = bookingCategoryLabels[locale];
+const faqCopy = faq[locale];
+const nearbyC = nearbyCopy[locale];
+const faqSchema = {
+	'@context': 'https://schema.org',
+	'@type': 'FAQPage',
+	mainEntity: faqCopy.items.map((item) => ({
+		'@type': 'Question',
+		name: item.q,
+		acceptedAnswer: { '@type': 'Answer', text: item.a },
+	})),
+};
+const title = `${property.brand} — ${property.propertyName}, ${property.city}`;
+
+const latestNews = (await getCollection('news', (entry) => entry.data.locale === locale))
+	.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
+	.slice(0, 2);
+const newsDateFormatter = new Intl.DateTimeFormat(htmlLang[locale], { year: 'numeric', month: 'long', day: 'numeric' });
+function newsSlugFor(id: string) {
+	return id.replace(new RegExp(`-${locale}$`), '');
+}
+
+// Фото по типах номерів — ілюстративне зіставлення (реальні фото з об'єкта,
+// але не прив'язані 1:1 до конкретної кімнати з довідки клієнта).
+const roomPhotos: Record<string, ImageMetadata> = {
+	family: roomDouble,
+	single: roomSingle,
+	dormBed: roomDorm,
+	triple: roomTwinA,
+	fourBed: roomTwinB,
+};
+
+const roomCards = roomTypes.map((room) => ({
+	...room,
+	...amenitiesCopy.rooms[room.id],
+	img: roomPhotos[room.id],
+	rate: rates[room.rateCategory],
+}));
 
 const schema = {
 	'@context': 'https://schema.org',
@@ -45,15 +104,6 @@ const schema = {
 	sameAs: [property.bookingUrl],
 	inLanguage: htmlLang[locale],
 };
-
-const roomItems = [
-	{ img: roomDouble, ...copy.rooms.items.double },
-	{ img: roomTwinA, ...copy.rooms.items.twin },
-	{ img: roomDorm, ...copy.rooms.items.dorm },
-	{ img: roomSingle, ...copy.rooms.items.single },
-	{ img: lounge, ...copy.rooms.items.lounge },
-	{ img: dining, ...copy.rooms.items.dining },
-];
 ---
 
 <BaseLayout locale={locale} title={title} description={copy.metaDescription} path="/" schema={schema}>
@@ -90,23 +140,208 @@ const roomItems = [
 			</div>
 		</section>
 
-		<!-- Rooms -->
+		<!-- Rooms + tariffs -->
 		<section id="rooms" class="section section--dark">
 			<div class="container">
 				<p class="eyebrow eyebrow--dark">{copy.rooms.eyebrow}</p>
-				<h2 class="heading--dark">{copy.rooms.heading}</h2>
-				<p class="body-text body-text--dark section-subheading">{copy.rooms.subheading}</p>
+				<h2 class="heading--dark">{amenitiesCopy.roomsHeading}</h2>
+				<p class="body-text body-text--dark section-subheading">{amenitiesCopy.roomsSubheading}</p>
 
 				<div class="room-grid">
 					{
-						roomItems.map((room) => (
-							<article class="room-card">
+						roomCards.map((room, i) => (
+							<article class="room-card" data-room-index={i} role="button" tabindex="0" aria-haspopup="dialog" aria-label={room.title}>
 								<div class="room-card__img">
 									<Image src={room.img} alt={room.title} width={700} loading="lazy" />
 								</div>
 								<h3>{room.title}</h3>
-								<p>{room.caption}</p>
+								<p class="room-card__meta">
+									{room.beds} · {room.guests}
+								</p>
+								<div class="room-card__price">
+									<span class="price-amount">
+										{currency}
+										{room.rate.perNight.toFixed(2)}
+									</span>
+									<span class="price-unit">{copy.pricing.perDay}</span>
+								</div>
+								<p class="room-card__vat">
+									{copy.pricing.vatIncluded} {currency}
+									{withVat(room.rate.perNight).toFixed(2)}
+								</p>
 							</article>
+						))
+					}
+				</div>
+
+				<!-- Модалка з великим фото — відкривається кліком/Enter по картці номера. -->
+				<div id="room-modal" class="room-modal" hidden>
+					<div class="room-modal__scrim" data-room-modal-close></div>
+					<div class="room-modal__dialog" role="dialog" aria-modal="true">
+						<button type="button" class="room-modal__close" data-room-modal-close aria-label="Close">
+							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+						</button>
+						{
+							roomCards.map((room, i) => (
+								<div class="room-modal__panel" data-room-panel={i} hidden>
+									<div class="room-modal__img">
+										<Image src={room.img} alt={room.title} width={1100} loading="lazy" />
+									</div>
+									<div class="room-modal__body">
+										<h3 id={`room-modal-title-${i}`}>{room.title}</h3>
+										<p class="room-modal__meta">
+											{room.beds} · {room.guests}
+										</p>
+										<div class="room-card__price">
+											<span class="price-amount">
+												{currency}
+												{room.rate.perNight.toFixed(2)}
+											</span>
+											<span class="price-unit">{copy.pricing.perDay}</span>
+										</div>
+										<p class="room-card__vat">
+											{copy.pricing.vatIncluded} {currency}
+											{withVat(room.rate.perNight).toFixed(2)}
+										</p>
+										<a class="btn btn--primary" href={property.bookingUrl} target="_blank" rel="noopener noreferrer">
+											{copy.hero.ctaBook}
+										</a>
+									</div>
+								</div>
+							))
+						}
+					</div>
+				</div>
+
+				<p class="rooms-vat-note">{copy.pricing.vatExcluded}</p>
+
+				<!-- Пакетні тарифи (тиждень / 2 тижні / місяць) — за категоріями, не за
+				     кожним типом номера окремо (обидва "shared"-типи номерів мають
+				     однакову ціну на цій категорії). -->
+				<div class="package-grid">
+					{
+						(
+							[
+								['shared', copy.pricing.categoryShared],
+								['family', copy.pricing.categoryFamily],
+							] as const
+						).map(([key, label]) => {
+							const rate = rates[key];
+							return (
+								<div class="package-card">
+									<h3>{label}</h3>
+									<dl>
+										<div>
+											<dt>{copy.pricing.colPerMonth}</dt>
+											<dd>
+												{currency}
+												{rate.perMonth.toFixed(2)}
+											</dd>
+										</div>
+										<div>
+											<dt>{copy.pricing.colWeek}</dt>
+											<dd>
+												{currency}
+												{rate.week.toFixed(2)}
+												<span class="package-save">
+													{copy.pricing.save} {savingsPercent(rate.perNight, rate.week, 7)}%
+												</span>
+											</dd>
+										</div>
+										<div>
+											<dt>{copy.pricing.colTwoWeeks}</dt>
+											<dd>
+												{currency}
+												{rate.twoWeeks.toFixed(2)}
+												<span class="package-save">
+													{copy.pricing.save} {savingsPercent(rate.perNight, rate.twoWeeks, 14)}%
+												</span>
+											</dd>
+										</div>
+									</dl>
+								</div>
+							);
+						})
+					}
+				</div>
+
+				<div class="terms-note">
+					<strong>{copy.pricing.termsHeading}:</strong> {copy.pricing.termsPrepay} {copy.pricing.termsEarlyCheckout}
+				</div>
+			</div>
+		</section>
+
+		<script is:inline>
+			(function () {
+				var modal = document.getElementById('room-modal');
+				if (!modal) return;
+				var panels = modal.querySelectorAll('[data-room-panel]');
+				var closers = modal.querySelectorAll('[data-room-modal-close]');
+				var triggers = document.querySelectorAll('[data-room-index]');
+
+				function openRoom(index) {
+					panels.forEach(function (p) {
+						p.hidden = p.getAttribute('data-room-panel') !== String(index);
+					});
+					modal.hidden = false;
+					document.body.style.overflow = 'hidden';
+				}
+
+				function closeRoom() {
+					modal.hidden = true;
+					document.body.style.overflow = '';
+				}
+
+				triggers.forEach(function (el) {
+					el.addEventListener('click', function () {
+						openRoom(el.getAttribute('data-room-index'));
+					});
+					el.addEventListener('keydown', function (e) {
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							openRoom(el.getAttribute('data-room-index'));
+						}
+					});
+				});
+
+				closers.forEach(function (el) {
+					el.addEventListener('click', closeRoom);
+				});
+
+				document.addEventListener('keydown', function (e) {
+					if (e.key === 'Escape' && !modal.hidden) closeRoom();
+				});
+			})();
+		</script>
+
+		<!-- Amenities -->
+		<section id="amenities" class="section section--light">
+			<div class="container">
+				<p class="eyebrow">{amenitiesCopy.section.eyebrow}</p>
+				<h2>{amenitiesCopy.section.heading}</h2>
+				<p class="body-text section-subheading">{amenitiesCopy.section.subheading}</p>
+
+				<div class="amenity-grid">
+					{
+						amenityCategories.map((cat) => (
+							<div class="amenity-card">
+								<h3>{amenitiesCopy.categories[cat.id as keyof typeof amenitiesCopy.categories]}</h3>
+								<ul>
+									{cat.items.map((item) => (
+										<li class={item.badge === 'none' ? 'is-unavailable' : ''}>
+											<span class="amenity-item__label">
+												<AmenityIcon id={item.id} />
+												<span class="amenity-item__name">{amenitiesCopy.items[item.id]}</span>
+											</span>
+											{item.hasValue ? (
+												<span class="amenity-item__value">{amenitiesCopy.values[item.id]}</span>
+											) : item.badge && item.badge !== 'none' ? (
+												<span class={`amenity-badge amenity-badge--${item.badge}`}>{amenitiesCopy.badges[item.badge]}</span>
+											) : null}
+										</li>
+									))}
+								</ul>
+							</div>
 						))
 					}
 				</div>
@@ -138,15 +373,161 @@ const roomItems = [
 
 				<div class="review-cards">
 					<a class="review-card" href={property.bookingUrl} target="_blank" rel="noopener noreferrer">
-						<span class="review-card__label">Booking.com</span>
+						<div class="review-card__top">
+							<span class="review-card__brand">
+								<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+									<rect width="18" height="18" rx="4" fill="#003580" />
+									<path
+										d="M6.2 4.2h3.55c1.55 0 2.55.78 2.55 2.05 0 .9-.5 1.5-1.15 1.78.85.28 1.45.98 1.45 1.98 0 1.4-1.1 2.17-2.7 2.17H6.2V4.2Zm3.35 3.35c.7 0 1.15-.38 1.15-.98 0-.6-.45-.95-1.15-.95H7.85v1.93h1.7Zm.2 3.4c.75 0 1.25-.4 1.25-1.05 0-.63-.5-1.03-1.25-1.03H7.85v2.08h1.9Z"
+										fill="#fff"
+									/>
+								</svg>
+								<span class="review-card__label">Booking.com</span>
+							</span>
+							<span class="review-card__score">
+								{property.bookingScore}<span class="review-card__score-max">/10</span>
+							</span>
+						</div>
+						<span class="review-card__count">{property.bookingReviewCount}+ reviews · {property.bookingSnapshotDate}</span>
 						<span class="review-card__cta">{copy.reviews.bookingCta} →</span>
 					</a>
-					<a class="review-card" href={property.mapLinkHref} target="_blank" rel="noopener noreferrer">
-						<span class="review-card__label">Google</span>
+					<a class="review-card" href={property.googleReviewsUrl} target="_blank" rel="noopener noreferrer">
+						<div class="review-card__top">
+							<span class="review-card__brand">
+								<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+									<path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" />
+									<path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" />
+									<path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" />
+									<path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" />
+								</svg>
+								<span class="review-card__label">Google</span>
+							</span>
+							<span class="review-card__score">
+								{property.googleScore}<span class="review-card__score-max">/5</span>
+							</span>
+						</div>
+						<span class="review-card__count">{property.googleReviewCount} reviews</span>
 						<span class="review-card__cta">{copy.reviews.googleCta} →</span>
 					</a>
 				</div>
+
+				<div class="category-scores">
+					{
+						Object.entries(bookingCategoryScores).map(([key, score]) => (
+							<div class="category-row">
+								<span class="category-row__label">{categoryLabels[key as keyof typeof categoryLabels]}</span>
+								<span class="category-row__bar">
+									<span class="category-row__fill" style={`width:${(score / 10) * 100}%`} />
+								</span>
+								<span class="category-row__score">{score.toFixed(1)}</span>
+							</div>
+						))
+					}
+				</div>
+
+				<div class="guest-carousel">
+					<p class="recent-guests-label">{copy.reviews.recentGuestsLabel}</p>
+					<div class="guest-carousel__row">
+						<ul class="guest-list" id="guest-list">
+							{
+								guestReviews.map((r) => (
+									<li class={`guest-card ${r.score >= 8 ? 'is-good' : r.score >= 5 ? 'is-mid' : 'is-low'}`}>
+										<div class="guest-card__top">
+											<span class="guest-card__name">
+												<span aria-hidden="true">{r.countryFlag}</span> {r.name}
+											</span>
+											<span class="guest-card__score">{r.score}</span>
+										</div>
+										<p class="guest-card__meta">
+											{r.roomType} · {r.date}
+										</p>
+										{r.title && <p class="guest-card__title">“{r.title}”</p>}
+										{r.comment && <p class="guest-card__comment">{r.comment}</p>}
+									</li>
+								))
+							}
+						</ul>
+						<button type="button" class="guest-carousel__btn guest-carousel__btn--prev" data-guest-scroll="-1" aria-label="Previous">
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+						</button>
+						<button type="button" class="guest-carousel__btn guest-carousel__btn--next" data-guest-scroll="1" aria-label="Next">
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+						</button>
+					</div>
+				</div>
 			</div>
+
+			<script is:inline>
+				(function () {
+					var list = document.getElementById('guest-list');
+					if (!list) return;
+					document.querySelectorAll('[data-guest-scroll]').forEach(function (btn) {
+						btn.addEventListener('click', function () {
+							var dir = parseInt(btn.getAttribute('data-guest-scroll'), 10);
+							list.scrollBy({ left: dir * 280, behavior: 'smooth' });
+						});
+					});
+				})();
+			</script>
+		</section>
+
+		<!-- News -->
+		{
+			latestNews.length > 0 && (
+				<section id="news" class="section section--light">
+					<div class="container">
+						<p class="eyebrow">{newsC.navLabel}</p>
+						<h2>{newsC.heading}</h2>
+						<p class="body-text section-subheading">{newsC.subheading}</p>
+
+						<div class="news-grid">
+							{latestNews.map((post) => (
+								<a class="news-card" href={`/${locale}/news/${newsSlugFor(post.id)}`}>
+									<div class="news-card__img">
+										<Image src={newsImages[post.data.image]} alt={post.data.title} width={700} loading="lazy" />
+									</div>
+									<div class="news-card__body">
+										<time datetime={post.data.date.toISOString()}>{newsDateFormatter.format(post.data.date)}</time>
+										<h3>{post.data.title}</h3>
+										<p>{post.data.excerpt}</p>
+										<span class="read-more">{newsC.readMore} →</span>
+									</div>
+								</a>
+							))}
+						</div>
+
+						<a class="btn btn--primary-dark news-all-link" href={`/${locale}/news`}>
+							{newsC.navLabel} →
+						</a>
+					</div>
+				</section>
+			)
+		}
+
+		<!-- FAQ -->
+		<section id="faq" class="section section--dark">
+			<div class="container">
+				<p class="eyebrow eyebrow--dark">{faqCopy.eyebrow}</p>
+				<h2 class="heading--dark">{faqCopy.heading}</h2>
+				<p class="body-text body-text--dark section-subheading">{faqCopy.subheading}</p>
+
+				<div class="faq-list">
+					{
+						faqCopy.items.map((item) => (
+							<details class="faq-item">
+								<summary>
+									{item.q}
+									<svg class="faq-item__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+										<path d="M6 9l6 6 6-6" />
+									</svg>
+								</summary>
+								<p>{item.a}</p>
+							</details>
+						))
+					}
+				</div>
+			</div>
+			<script is:inline type="application/ld+json" set:html={JSON.stringify(faqSchema)} />
 		</section>
 
 		<!-- Location / Contact -->
@@ -181,6 +562,62 @@ const roomItems = [
 						loading="lazy"
 						referrerpolicy="no-referrer-when-downgrade"
 					></iframe>
+				</div>
+			</div>
+		</section>
+
+		<!-- Nearby -->
+		<section class="section section--dark">
+			<div class="container">
+				<p class="eyebrow eyebrow--dark">{nearbyC.eyebrow}</p>
+				<h2 class="heading--dark">{nearbyC.heading}</h2>
+				<p class="body-text body-text--dark section-subheading">{nearbyC.subheading}</p>
+
+				<div class="nearby-grid">
+					{
+						(
+							[
+								['attractions', nearby.attractions],
+								['food', nearby.food],
+								['nature', nearby.nature],
+								['transport', nearby.transport],
+							] as const
+						).map(([key, places]) => (
+							<div class="nearby-col">
+								<h3>
+									<svg class="nearby-col__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+										{key === 'attractions' && <path d="M3 21h18M5 21V10M19 21V10M5 10l7-6 7 6M9 10v11M15 10v11" />}
+										{key === 'food' && (
+											<>
+												<path d="M4 9h13v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V9Z" />
+												<path d="M17 11h1.5a2 2 0 0 1 0 4H17" />
+											</>
+										)}
+										{key === 'nature' && <path d="M3 20l6-11 4 6 3-4 5 9H3Z" />}
+										{key === 'transport' && (
+											<>
+												<rect x="3" y="6" width="18" height="10" rx="2" />
+												<path d="M3 12h18" />
+												<circle cx="7.5" cy="18.5" r="1.5" />
+												<circle cx="16.5" cy="18.5" r="1.5" />
+											</>
+										)}
+									</svg>
+									{nearbyC.categories[key]}
+								</h3>
+								<ul>
+									{places.map((p) => (
+										<li>
+											<a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name + ', Estonia')}`} target="_blank" rel="noopener noreferrer">
+												{p.name}
+											</a>
+											<span class="nearby-col__km">{p.km} km</span>
+										</li>
+									))}
+								</ul>
+							</div>
+						))
+					}
 				</div>
 			</div>
 		</section>
@@ -221,9 +658,10 @@ const roomItems = [
 		}
 
 		.hero h1 {
+			font-family: var(--font-display);
 			margin: 0.4rem 0 1rem;
 			font-size: clamp(2rem, 5vw, 3.25rem);
-			font-weight: 800;
+			font-weight: 600;
 			letter-spacing: -0.01em;
 			max-width: 40rem;
 		}
@@ -284,9 +722,10 @@ const roomItems = [
 		}
 
 		h2 {
+			font-family: var(--font-display);
 			margin: 0.5rem 0 1rem;
 			font-size: clamp(1.6rem, 3.2vw, 2.25rem);
-			font-weight: 800;
+			font-weight: 600;
 			letter-spacing: -0.01em;
 		}
 
@@ -319,7 +758,7 @@ const roomItems = [
 
 		.btn--primary {
 			background: var(--accent);
-			color: #241a0c;
+			color: var(--accent-ink);
 		}
 
 		.btn--primary:hover {
@@ -374,6 +813,117 @@ const roomItems = [
 			border: 1px solid var(--border-dark);
 			border-radius: 1rem;
 			overflow: hidden;
+			cursor: pointer;
+			display: flex;
+			flex-direction: column;
+			height: 100%;
+			transition: border-color 0.15s ease, transform 0.15s ease;
+		}
+
+		.room-card:hover,
+		.room-card:focus-visible {
+			border-color: var(--accent);
+			transform: translateY(-2px);
+		}
+
+		.room-card:focus-visible {
+			outline: 2px solid var(--accent);
+			outline-offset: 2px;
+		}
+
+		/* Модалка деталей номера */
+		.room-modal:not([hidden]) {
+			position: fixed;
+			inset: 0;
+			z-index: 150;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 1.25rem;
+		}
+
+		.room-modal__scrim {
+			position: absolute;
+			inset: 0;
+			background: rgba(11, 13, 16, 0.78);
+			backdrop-filter: blur(6px);
+		}
+
+		.room-modal__dialog {
+			position: relative;
+			width: 100%;
+			max-width: 46rem;
+			max-height: 88vh;
+			overflow-y: auto;
+			background: var(--surface-dark);
+			border: 1px solid var(--border-dark);
+			border-radius: 1.25rem;
+			box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+		}
+
+		.room-modal__close {
+			position: absolute;
+			top: 0.9rem;
+			right: 0.9rem;
+			z-index: 1;
+			width: 2.25rem;
+			height: 2.25rem;
+			border-radius: 50%;
+			border: 1px solid var(--border-dark);
+			background: var(--surface-dark-2);
+			color: var(--cream);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+		}
+
+		.room-modal__close:hover {
+			border-color: var(--accent);
+			color: var(--accent);
+		}
+
+		.room-modal__panel:not([hidden]) {
+			display: block;
+		}
+
+		.room-modal__img :global(img) {
+			width: 100%;
+			height: 18rem;
+			object-fit: cover;
+			display: block;
+			border-radius: 1.25rem 1.25rem 0 0;
+		}
+
+		.room-modal__body {
+			padding: 1.5rem;
+		}
+
+		.room-modal__body h3 {
+			margin: 0 0 0.4rem;
+			font-size: 1.3rem;
+			font-weight: 800;
+			color: var(--cream);
+		}
+
+		.room-modal__meta {
+			margin: 0 0 1rem;
+			font-size: 0.9rem;
+			color: var(--cream-muted);
+		}
+
+		.room-modal__body .room-card__price {
+			margin: 0 0 0.2rem;
+		}
+
+		.room-modal__body .room-card__vat {
+			margin: 0 0 1.25rem;
+		}
+
+		@media (min-width: 640px) {
+			.room-modal__img :global(img) {
+				height: 22rem;
+			}
 		}
 
 		.room-card__img {
@@ -389,16 +939,204 @@ const roomItems = [
 		}
 
 		.room-card h3 {
-			margin: 1rem 1.1rem 0.35rem;
+			margin: 1rem 1.1rem 0.3rem;
 			font-size: 1.05rem;
 			font-weight: 700;
 		}
 
-		.room-card p {
-			margin: 0 1.1rem 1.1rem;
-			font-size: 0.88rem;
-			line-height: 1.5;
+		.room-card__meta {
+			margin: 0 1.1rem 0.9rem;
+			font-size: 0.85rem;
 			color: var(--cream-muted);
+		}
+
+		.room-card__price {
+			margin: auto 1.1rem 0;
+			display: flex;
+			align-items: baseline;
+			gap: 0.35rem;
+		}
+
+		.price-amount {
+			font-size: 1.35rem;
+			font-weight: 800;
+			color: var(--accent);
+		}
+
+		.price-unit {
+			font-size: 0.8rem;
+			color: var(--muted);
+		}
+
+		.room-card__vat {
+			margin: 0.2rem 1.1rem 1.1rem;
+			font-size: 0.75rem;
+			color: var(--muted);
+		}
+
+		.rooms-vat-note {
+			margin: 1.75rem 0 0;
+			font-size: 0.8rem;
+			color: var(--muted);
+		}
+
+		/* Package rates */
+		.package-grid {
+			margin-top: 1.25rem;
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+			gap: 1.25rem;
+		}
+
+		.package-card {
+			background: var(--surface-dark);
+			border: 1px solid var(--border-dark);
+			border-radius: 1rem;
+			padding: 1.5rem;
+		}
+
+		.package-card h3 {
+			margin: 0 0 1rem;
+			font-size: 1rem;
+			font-weight: 700;
+			color: var(--accent);
+		}
+
+		.package-card dl {
+			margin: 0;
+			display: grid;
+			gap: 0.7rem;
+		}
+
+		.package-card dt {
+			font-size: 0.75rem;
+			color: var(--muted);
+		}
+
+		.package-card dd {
+			margin: 0.1rem 0 0;
+			font-weight: 700;
+			display: flex;
+			align-items: center;
+			gap: 0.55rem;
+			flex-wrap: wrap;
+		}
+
+		.package-save {
+			font-size: 0.72rem;
+			font-weight: 700;
+			color: #7fd99a;
+			background: rgba(127, 217, 154, 0.12);
+			padding: 0.15rem 0.5rem;
+			border-radius: 999px;
+		}
+
+		.terms-note {
+			margin-top: 1.5rem;
+			font-size: 0.82rem;
+			line-height: 1.6;
+			color: var(--cream-muted);
+			border-top: 1px solid var(--border-dark);
+			padding-top: 1.25rem;
+		}
+
+		/* Amenities */
+		.amenity-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+			gap: 1.5rem;
+		}
+
+		.amenity-card {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 1rem;
+			padding: 1.5rem 1.5rem 0.5rem;
+		}
+
+		.amenity-card h3 {
+			margin: 0 0 0.75rem;
+			font-size: 0.95rem;
+			font-weight: 700;
+			color: var(--text-dark);
+		}
+
+		.amenity-card ul {
+			list-style: none;
+			margin: 0;
+			padding: 0;
+		}
+
+		.amenity-card li {
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: space-between;
+			align-items: center;
+			gap: 0.4rem 0.75rem;
+			padding: 0.6rem 0;
+			border-bottom: 1px solid var(--border-light);
+			font-size: 0.85rem;
+		}
+
+		.amenity-card li:last-child {
+			border-bottom: none;
+		}
+
+		.amenity-item__label {
+			display: flex;
+			align-items: center;
+			gap: 0.6rem;
+			min-width: 0;
+			flex: 1 1 12rem;
+		}
+
+		.amenity-item__name {
+			color: var(--text-dark);
+			overflow-wrap: anywhere;
+		}
+
+		.amenity-card li.is-unavailable .amenity-item__name {
+			color: var(--text-dark-muted);
+			text-decoration: line-through;
+		}
+
+		.amenity-card li.is-unavailable .amenity-icon {
+			color: var(--text-dark-muted);
+			opacity: 0.55;
+		}
+
+		.amenity-item__value {
+			font-size: 0.78rem;
+			color: var(--text-dark-muted);
+			white-space: nowrap;
+			margin-inline-start: auto;
+		}
+
+		.amenity-badge {
+			font-size: 0.68rem;
+			font-weight: 700;
+			padding: 0.2rem 0.55rem;
+			border-radius: 999px;
+			white-space: nowrap;
+			margin-inline-start: auto;
+			background: #eee;
+			color: #555;
+		}
+
+		.amenity-badge--free {
+			background: #d7f2df;
+			color: #1e6b3a;
+		}
+
+		.amenity-badge--extra {
+			background: #fbe6c7;
+			color: #8a5a1c;
+		}
+
+		.amenity-badge--someRooms,
+		.amenity-badge--daily {
+			background: #e6e2d8;
+			color: #5c5646;
 		}
 
 		/* Buffet */
@@ -414,8 +1152,8 @@ const roomItems = [
 			margin-top: 1rem;
 			padding: 0.4rem 0.8rem;
 			border-radius: 0.5rem;
-			background: rgba(226, 182, 118, 0.18);
-			color: #8a5a1c;
+			background: rgba(0, 114, 206, 0.1);
+			color: #0058a3;
 			font-weight: 700;
 			font-size: 0.85rem;
 		}
@@ -457,16 +1195,370 @@ const roomItems = [
 			border-color: var(--accent);
 		}
 
+		.review-card__top {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.75rem;
+		}
+
+		.review-card__brand {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+		}
+
+		.review-card__brand svg {
+			flex-shrink: 0;
+		}
+
 		.review-card__label {
 			font-weight: 700;
 			color: var(--cream);
 			font-size: 1.05rem;
 		}
 
+		.review-card__score {
+			font-weight: 800;
+			font-size: 1.1rem;
+			color: var(--accent-ink);
+			background: var(--accent);
+			padding: 0.15rem 0.55rem;
+			border-radius: 0.4rem;
+		}
+
+		.review-card__score-max {
+			font-size: 0.7rem;
+			font-weight: 600;
+			opacity: 0.75;
+		}
+
+		.review-card__count {
+			font-size: 0.78rem;
+			color: var(--muted);
+		}
+
 		.review-card__cta {
 			color: var(--accent);
 			font-size: 0.9rem;
 			font-weight: 600;
+		}
+
+		.category-scores {
+			margin-top: 2rem;
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+			gap: 0.6rem 2rem;
+		}
+
+		.category-row {
+			display: grid;
+			grid-template-columns: 8rem 1fr 2rem;
+			align-items: center;
+			gap: 0.7rem;
+		}
+
+		.category-row__label {
+			font-size: 0.8rem;
+			color: var(--cream-muted);
+		}
+
+		.category-row__bar {
+			display: block;
+			height: 0.35rem;
+			border-radius: 999px;
+			background: var(--surface-dark-2);
+			overflow: hidden;
+		}
+
+		.category-row__fill {
+			display: block;
+			height: 100%;
+			background: var(--accent);
+			border-radius: 999px;
+		}
+
+		.category-row__score {
+			font-size: 0.78rem;
+			font-weight: 700;
+			color: var(--cream);
+			text-align: right;
+		}
+
+		.recent-guests-label {
+			margin: 2rem 0 0.75rem;
+			font-size: 0.75rem;
+			font-weight: 700;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+			color: var(--muted);
+		}
+
+		.guest-carousel {
+			position: relative;
+		}
+
+		.guest-carousel__row {
+			position: relative;
+		}
+
+		.guest-list {
+			list-style: none;
+			margin: 0;
+			padding: 0 0.25rem;
+			display: flex;
+			gap: 0.9rem;
+			overflow-x: auto;
+			scroll-snap-type: x proximity;
+			scrollbar-width: none;
+		}
+
+		.guest-list::-webkit-scrollbar {
+			display: none;
+		}
+
+		.guest-card {
+			flex: 0 0 16rem;
+			scroll-snap-align: start;
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+			font-size: 0.82rem;
+			color: var(--cream-muted);
+			background: var(--surface-dark);
+			border: 1px solid var(--border-dark);
+			border-radius: 0.85rem;
+			padding: 1rem 1.1rem;
+		}
+
+		.guest-card__top {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.5rem;
+		}
+
+		.guest-card__name {
+			font-weight: 700;
+			color: var(--cream);
+		}
+
+		.guest-card__score {
+			font-size: 0.75rem;
+			font-weight: 800;
+			padding: 0.1rem 0.5rem;
+			border-radius: 999px;
+			background: var(--surface-dark-2);
+			color: var(--cream-muted);
+			flex-shrink: 0;
+		}
+
+		.guest-card.is-good .guest-card__score {
+			background: rgba(52, 168, 83, 0.18);
+			color: #7fd99a;
+		}
+
+		.guest-card.is-mid .guest-card__score {
+			background: rgba(251, 188, 5, 0.18);
+			color: #f0c14b;
+		}
+
+		.guest-card.is-low .guest-card__score {
+			background: rgba(234, 67, 53, 0.18);
+			color: #f28b82;
+		}
+
+		.guest-card__meta {
+			margin: 0;
+			font-size: 0.72rem;
+			color: var(--muted);
+		}
+
+		.guest-card__title {
+			margin: 0;
+			font-weight: 600;
+			color: var(--cream-muted);
+			font-style: italic;
+		}
+
+		.guest-card__comment {
+			margin: 0;
+			font-size: 0.78rem;
+			line-height: 1.5;
+			white-space: pre-line;
+			color: var(--cream-muted);
+		}
+
+		.guest-carousel__btn {
+			position: absolute;
+			top: 50%;
+			transform: translateY(-50%);
+			width: 2.1rem;
+			height: 2.1rem;
+			border-radius: 50%;
+			border: 1px solid var(--border-dark);
+			background: var(--bg-dark);
+			color: var(--cream);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+			box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+		}
+
+		.guest-carousel__btn:hover {
+			border-color: var(--accent);
+			color: var(--accent);
+		}
+
+		.guest-carousel__btn--prev {
+			left: -0.6rem;
+		}
+
+		.guest-carousel__btn--next {
+			right: -0.6rem;
+		}
+
+		@media (max-width: 640px) {
+			.guest-carousel__btn {
+				display: none;
+			}
+		}
+
+		/* News — компактно: маленькі горизонтальні картки, не на весь екран */
+		.news-grid {
+			display: flex;
+			flex-direction: column;
+			gap: 0.75rem;
+			margin-bottom: 1.5rem;
+		}
+
+		.news-card {
+			display: grid;
+			grid-template-columns: 4.5rem 1fr;
+			gap: 0.9rem;
+			align-items: center;
+			overflow: hidden;
+			border: 1px solid var(--border-light);
+			border-radius: 0.75rem;
+			text-decoration: none;
+			color: inherit;
+			background: #fff;
+			padding: 0.6rem;
+			transition: border-color 0.15s ease;
+		}
+
+		.news-card:hover {
+			border-color: var(--accent);
+		}
+
+		.news-card__img {
+			aspect-ratio: 1 / 1;
+			overflow: hidden;
+			border-radius: 0.5rem;
+		}
+
+		.news-card__img :global(img) {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+			display: block;
+		}
+
+		.news-card__body {
+			min-width: 0;
+		}
+
+		.news-card time {
+			font-size: 0.7rem;
+			color: var(--text-dark-muted);
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
+		}
+
+		.news-card h3 {
+			margin: 0.15rem 0 0.2rem;
+			font-size: 0.95rem;
+			font-weight: 700;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.news-card p {
+			display: none;
+		}
+
+		.news-card .read-more {
+			font-size: 0.78rem;
+			font-weight: 600;
+			color: var(--accent);
+		}
+
+		.news-all-link {
+			display: inline-flex;
+		}
+
+		/* FAQ */
+		.faq-list {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+			gap: 0.9rem;
+			align-items: start;
+		}
+
+		.faq-item {
+			border: 1px solid var(--border-dark);
+			border-radius: 0.9rem;
+			background: var(--surface-dark);
+			padding: 0 1.25rem;
+			transition: border-color 0.15s ease;
+		}
+
+		.faq-item:hover {
+			border-color: rgba(0, 114, 206, 0.4);
+		}
+
+		.faq-item[open] {
+			border-color: var(--accent);
+		}
+
+		.faq-item summary {
+			list-style: none;
+			cursor: pointer;
+			padding: 1.05rem 0;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 1rem;
+			font-weight: 600;
+			font-size: 0.92rem;
+			line-height: 1.4;
+			color: var(--cream);
+		}
+
+		.faq-item summary::-webkit-details-marker {
+			display: none;
+		}
+
+		.faq-item__chevron {
+			flex-shrink: 0;
+			transition: transform 0.2s ease, color 0.15s ease;
+			color: var(--muted);
+		}
+
+		.faq-item[open] .faq-item__chevron {
+			transform: rotate(180deg);
+			color: var(--accent);
+		}
+
+		.faq-item p {
+			margin: -0.3rem 0 1.1rem;
+			color: var(--cream-muted);
+			font-size: 0.86rem;
+			line-height: 1.6;
+			border-top: 1px solid var(--border-dark);
+			padding-top: 0.85rem;
 		}
 
 		/* Location */
@@ -516,6 +1608,65 @@ const roomItems = [
 			height: 100%;
 			border: 0;
 			display: block;
+		}
+
+		/* Nearby */
+		.nearby-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+			gap: 2rem;
+		}
+
+		.nearby-col h3 {
+			margin: 0 0 0.75rem;
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			font-size: 0.85rem;
+			font-weight: 700;
+			color: var(--accent);
+			text-transform: uppercase;
+			letter-spacing: 0.04em;
+		}
+
+		.nearby-col__icon {
+			flex-shrink: 0;
+		}
+
+		.nearby-col ul {
+			list-style: none;
+			margin: 0;
+			padding: 0;
+		}
+
+		.nearby-col li {
+			display: flex;
+			justify-content: space-between;
+			gap: 0.75rem;
+			padding: 0.45rem 0;
+			border-bottom: 1px solid var(--border-dark);
+			font-size: 0.85rem;
+			color: var(--cream-muted);
+		}
+
+		.nearby-col li a {
+			color: var(--cream-muted);
+			text-decoration: none;
+		}
+
+		.nearby-col li a:hover {
+			color: var(--accent);
+			text-decoration: underline;
+		}
+
+		.nearby-col li:last-child {
+			border-bottom: none;
+		}
+
+		.nearby-col__km {
+			flex-shrink: 0;
+			color: var(--muted);
+			font-variant-numeric: tabular-nums;
 		}
 
 		@media (max-width: 860px) {

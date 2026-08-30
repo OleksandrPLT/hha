@@ -1,0 +1,67 @@
+---
+import { countries, isoToFlag } from '../data/countries';
+
+interface Props {
+	name: string;
+	id?: string;
+	required?: boolean;
+	defaultIso?: string;
+	value?: string;
+	countryValue?: string;
+}
+
+const { name, id = name, required = false, defaultIso = 'EE', value = '', countryValue } = Astro.props;
+const selectedDial = countryValue ?? countries.find((c) => c.iso2 === defaultIso)?.dial ?? '+372';
+---
+
+<div class="phone-input">
+	<select name={`${name}_country`} id={`${id}_country`} class="phone-input__country" aria-label="Country code">
+		{
+			countries.map((c) => (
+				<option value={c.dial} selected={c.dial === selectedDial}>
+					{isoToFlag(c.iso2)} {c.dial} {c.name}
+				</option>
+			))
+		}
+	</select>
+	<input
+		type="tel"
+		name={name}
+		id={id}
+		class="phone-input__number"
+		inputmode="tel"
+		required={required}
+		placeholder="5xx xxxxx"
+		pattern="[0-9 \-]{4,}"
+		value={value}
+	/>
+</div>
+
+<style>
+	.phone-input {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.phone-input__country {
+		flex: 0 0 auto;
+		max-width: 6.5rem;
+		font: inherit;
+		padding: 0.6rem 0.4rem;
+		border-radius: 0.5rem;
+		border: 1px solid var(--border-light, var(--border-dark));
+		background: #fff;
+		color: inherit;
+	}
+
+	.phone-input__number {
+		flex: 1;
+		min-width: 0;
+		font: inherit;
+		padding: 0.6rem 0.75rem;
+		border-radius: 0.5rem;
+		border: 1px solid var(--border-light, var(--border-dark));
+		background: #fff;
+		color: inherit;
+	}
+</style>

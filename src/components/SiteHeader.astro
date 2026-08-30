@@ -1,7 +1,11 @@
 ---
-import { locales, localeNames, type Locale } from '../i18n/locales';
+import { locales, localeNames, localeFlags, type Locale } from '../i18n/locales';
 import { landing } from '../i18n/landing';
+import { amenities } from '../i18n/amenities';
+import { newsCopy } from '../i18n/news';
+import { account } from '../i18n/account';
 import { property } from '../data/property';
+import Logo from './Logo.astro';
 
 interface Props {
 	locale: Locale;
@@ -9,38 +13,50 @@ interface Props {
 
 const { locale } = Astro.props;
 const copy = landing[locale];
+const amenitiesCopy = amenities[locale];
+const newsC = newsCopy[locale];
+const accountC = account[locale];
 ---
 
 <header class="site-header">
 	<div class="site-header__inner">
 		<a class="site-header__brand" href={`/${locale}`}>
-			<span class="site-header__brand-main">H&amp;H</span>
-			<span class="site-header__brand-sub">apartments</span>
+			<Logo size={30} />
+			<span class="site-header__brand-text">
+				<span class="site-header__brand-main">Hostel &amp; Hotel</span>
+				<span class="site-header__brand-sub">Apartments</span>
+			</span>
 		</a>
 
 		<nav class="site-header__nav" aria-label="Sections">
 			<a href="#about">{copy.nav.about}</a>
 			<a href="#rooms">{copy.nav.rooms}</a>
+			<a href="#amenities">{amenitiesCopy.section.eyebrow}</a>
 			<a href="#buffet">{copy.nav.buffet}</a>
+			<a href={`/${locale}/news`}>{newsC.navLabel}</a>
 			<a href="#location">{copy.nav.location}</a>
 			<a href="#contact">{copy.nav.contact}</a>
 		</nav>
 
 		<div class="site-header__actions">
 			<details class="lang-switch">
-				<summary aria-label="Language">{locale.toUpperCase()}</summary>
+				<summary aria-label="Language">
+					<span aria-hidden="true">{localeFlags[locale]}</span> {locale.toUpperCase()}
+				</summary>
 				<ul>
 					{
 						locales.map((l) => (
 							<li>
 								<a href={`/${l}`} class={l === locale ? 'is-current' : ''}>
-									{localeNames[l]}
+									<span aria-hidden="true">{localeFlags[l]}</span> {localeNames[l]}
 								</a>
 							</li>
 						))
 					}
 				</ul>
 			</details>
+
+			<a class="site-header__account" href={`/${locale}/account`} data-account-trigger>{accountC.nav.myAccount}</a>
 
 			<a class="site-header__cta" href={property.bookingUrl} target="_blank" rel="noopener noreferrer">
 				{copy.nav.bookNow}
@@ -71,21 +87,31 @@ const copy = landing[locale];
 
 	.site-header__brand {
 		display: flex;
-		align-items: baseline;
-		gap: 0.35rem;
+		align-items: center;
+		gap: 0.55rem;
 		text-decoration: none;
 		color: var(--cream);
 		white-space: nowrap;
 	}
 
+	.site-header__brand-text {
+		display: flex;
+		flex-direction: column;
+		line-height: 1.15;
+	}
+
 	.site-header__brand-main {
-		font-weight: 800;
-		font-size: 1.15rem;
+		font-family: var(--font-display);
+		font-weight: 600;
+		font-size: 0.98rem;
 		letter-spacing: -0.01em;
 	}
 
 	.site-header__brand-sub {
-		font-size: 0.8rem;
+		font-size: 0.65rem;
+		font-weight: 600;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
 		color: var(--cream-muted);
 	}
 
@@ -172,9 +198,21 @@ const copy = landing[locale];
 		font-weight: 700;
 	}
 
+	.site-header__account {
+		color: var(--cream-muted);
+		text-decoration: none;
+		font-size: 0.85rem;
+		font-weight: 600;
+		white-space: nowrap;
+	}
+
+	.site-header__account:hover {
+		color: var(--accent);
+	}
+
 	.site-header__cta {
 		background: var(--accent);
-		color: #241a0c;
+		color: var(--accent-ink);
 		text-decoration: none;
 		font-weight: 700;
 		font-size: 0.85rem;

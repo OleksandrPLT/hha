@@ -20,6 +20,17 @@ export const localeNames: Record<Locale, string> = {
 	fi: 'Suomi',
 };
 
+// Емодзі-прапорці для перемикача мови (шапка + модалка). Для en — 🇬🇧, бо
+// мова не прив'язана до однієї країни, а більшість гостей — з Європи.
+export const localeFlags: Record<Locale, string> = {
+	en: '🇬🇧',
+	et: '🇪🇪',
+	uk: '🇺🇦',
+	ru: '🇷🇺',
+	lv: '🇱🇻',
+	fi: '🇫🇮',
+};
+
 // Мова HTML-документа (lang атрибут) — окремо, бо коди збігаються з locale тут,
 // але залишаємо явним на випадок майбутніх регіональних варіантів (напр. en-GB).
 export const htmlLang: Record<Locale, string> = {

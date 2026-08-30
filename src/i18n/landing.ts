@@ -7,7 +7,7 @@ export interface RoomCopy {
 
 export interface LandingCopy {
 	metaDescription: string;
-	nav: { about: string; rooms: string; buffet: string; location: string; contact: string; bookNow: string };
+	nav: { about: string; rooms: string; pricing: string; buffet: string; location: string; contact: string; bookNow: string };
 	hero: { eyebrow: string; heading: string; subheading: string; ctaBook: string; ctaContact: string };
 	about: { eyebrow: string; heading: string; body: string };
 	rooms: {
@@ -16,8 +16,26 @@ export interface LandingCopy {
 		subheading: string;
 		items: { double: RoomCopy; twin: RoomCopy; dorm: RoomCopy; single: RoomCopy; lounge: RoomCopy; dining: RoomCopy };
 	};
+	pricing: {
+		eyebrow: string;
+		heading: string;
+		subheading: string;
+		categoryShared: string;
+		categoryFamily: string;
+		colPerNight: string;
+		colPerMonth: string;
+		colWeek: string;
+		colTwoWeeks: string;
+		save: string;
+		perDay: string;
+		vatExcluded: string;
+		vatIncluded: string;
+		termsHeading: string;
+		termsPrepay: string;
+		termsEarlyCheckout: string;
+	};
 	buffet: { eyebrow: string; heading: string; body: string; hours: string };
-	reviews: { eyebrow: string; heading: string; subheading: string; bookingCta: string; googleCta: string };
+	reviews: { eyebrow: string; heading: string; subheading: string; bookingCta: string; googleCta: string; recentGuestsLabel: string };
 	location: {
 		eyebrow: string;
 		heading: string;
@@ -27,7 +45,7 @@ export interface LandingCopy {
 		emailLabel: string;
 		mapCta: string;
 	};
-	footer: { rights: string; poweredBy: string };
+	footer: { rights: string; poweredBy: string; regCode: string };
 	languageModal: { heading: string; subheading: string; continueLabel: string };
 }
 
@@ -39,11 +57,11 @@ export interface LandingCopy {
 export const landing: Record<Locale, LandingCopy> = {
 	en: {
 		metaDescription:
-			'Hostel 3A by H&H apartments — private and shared rooms in Maardu, Estonia, minutes from Tallinn, with an on-site buffet.',
-		nav: { about: 'About', rooms: 'Rooms', buffet: 'Buffet', location: 'Location', contact: 'Contact', bookNow: 'Book now' },
+			'Hostel 3A by Hostel & Hotel Apartments — private and shared rooms in Maardu, Estonia, minutes from Tallinn, with an on-site buffet.',
+		nav: { about: 'About', rooms: 'Rooms', pricing: 'Prices', buffet: 'Buffet', location: 'Location', contact: 'Contact', bookNow: 'Book now' },
 		hero: {
-			eyebrow: 'Maardu, Estonia',
-			heading: 'H&H apartments — Hostel 3A',
+			eyebrow: 'Hostel 3A · Maardu, Estonia',
+			heading: 'Hostel & Hotel Apartments',
 			subheading:
 				"Comfortable private and shared rooms just outside Tallinn, with an on-site buffet and a quiet place to work or rest.",
 			ctaBook: 'Book on Booking.com',
@@ -68,6 +86,24 @@ export const landing: Record<Locale, LandingCopy> = {
 				dining: { title: 'Dining area', caption: 'A shared table for breakfast or an evening meal.' },
 			},
 		},
+		pricing: {
+			eyebrow: 'Prices',
+			heading: 'Rates',
+			subheading: 'Book by the night or save with a weekly / two-week package.',
+			categoryShared: 'Shared room',
+			categoryFamily: 'Family room',
+			colPerNight: 'Per night',
+			colPerMonth: 'Per month (30 nights)',
+			colWeek: 'Week (7 nights)',
+			colTwoWeeks: '2 weeks (14 nights)',
+			save: 'Save',
+			perDay: '/ night',
+			vatExcluded: 'Prices exclude VAT (13%).',
+			vatIncluded: 'incl. VAT:',
+			termsHeading: 'Booking terms',
+			termsPrepay: 'Week / 2-week / month packages require full prepayment at check-in.',
+			termsEarlyCheckout: 'Leaving early cancels the package discount — the stay is recalculated at the standard per-night rate.',
+		},
 		buffet: {
 			eyebrow: 'Pagari Buffet',
 			heading: 'Home-style food downstairs',
@@ -81,6 +117,7 @@ export const landing: Record<Locale, LandingCopy> = {
 			subheading: "We're connecting live ratings soon — for now, see recent guest reviews directly on Booking.com.",
 			bookingCta: 'Read reviews on Booking.com',
 			googleCta: 'Find us on Google',
+			recentGuestsLabel: 'Recent guests on Booking.com',
 		},
 		location: {
 			eyebrow: 'Location',
@@ -91,16 +128,16 @@ export const landing: Record<Locale, LandingCopy> = {
 			emailLabel: 'Email',
 			mapCta: 'Open in Google Maps',
 		},
-		footer: { rights: 'All rights reserved.', poweredBy: 'Website by' },
-		languageModal: { heading: 'Choose your language', subheading: 'H&H apartments is available in 6 languages.', continueLabel: 'Continue' },
+		footer: { rights: 'All rights reserved.', poweredBy: 'Website by', regCode: 'Reg. code' },
+		languageModal: { heading: 'Choose your language', subheading: 'Hostel & Hotel Apartments is available in 6 languages.', continueLabel: 'Continue' },
 	},
 	et: {
 		metaDescription:
-			'Hostel 3A by H&H apartments — privaat- ja jagatud toad Maardus, mõne minuti kaugusel Tallinnast, kohvikuga majas.',
-		nav: { about: 'Meist', rooms: 'Toad', buffet: 'Puhvet', location: 'Asukoht', contact: 'Kontakt', bookNow: 'Broneeri' },
+			'Hostel 3A by Hostel & Hotel Apartments — privaat- ja jagatud toad Maardus, mõne minuti kaugusel Tallinnast, kohvikuga majas.',
+		nav: { about: 'Meist', rooms: 'Toad', pricing: 'Hinnad', buffet: 'Puhvet', location: 'Asukoht', contact: 'Kontakt', bookNow: 'Broneeri' },
 		hero: {
-			eyebrow: 'Maardu, Eesti',
-			heading: 'H&H apartments — Hostel 3A',
+			eyebrow: 'Hostel 3A · Maardu, Eesti',
+			heading: 'Hostel & Hotel Apartments',
 			subheading: 'Mugavad privaat- ja jagatud toad Tallinna lähedal, majas oma puhvet ja rahulik koht töötamiseks või puhkamiseks.',
 			ctaBook: 'Broneeri Booking.com-is',
 			ctaContact: 'Võta ühendust',
@@ -124,6 +161,24 @@ export const landing: Record<Locale, LandingCopy> = {
 				dining: { title: 'Söögituba', caption: 'Ühine laud hommiku- või õhtusöögiks.' },
 			},
 		},
+		pricing: {
+			eyebrow: 'Hinnad',
+			heading: 'Hinnakiri',
+			subheading: 'Broneeri ööde kaupa või säästa nädala / kahe nädala paketiga.',
+			categoryShared: 'Jagatud tuba',
+			categoryFamily: 'Pere tuba',
+			colPerNight: 'Öö kohta',
+			colPerMonth: 'Kuu kohta (30 ööd)',
+			colWeek: 'Nädal (7 ööd)',
+			colTwoWeeks: '2 nädalat (14 ööd)',
+			save: 'Säästad',
+			perDay: '/ öö',
+			vatExcluded: 'Hinnad ei sisalda käibemaksu (13%).',
+			vatIncluded: 'koos käibemaksuga:',
+			termsHeading: 'Broneerimistingimused',
+			termsPrepay: 'Nädala / 2 nädala / kuu paketid eeldavad 100% ettemaksu sisseregistreerimisel.',
+			termsEarlyCheckout: 'Varasem lahkumine tühistab paketi soodustuse — viibimine arvestatakse ümber tavalise öö hinnaga.',
+		},
 		buffet: {
 			eyebrow: 'Pagari Puhvet',
 			heading: 'Kodune toit allkorrusel',
@@ -136,6 +191,7 @@ export const landing: Record<Locale, LandingCopy> = {
 			subheading: 'Peagi lisandub siia otseülekandega hinnang — praegu vaata värskeid arvustusi otse Booking.com-is.',
 			bookingCta: 'Loe arvustusi Booking.com-is',
 			googleCta: 'Leia meid Google\'ist',
+			recentGuestsLabel: 'Hiljutised külalised Booking.com-is',
 		},
 		location: {
 			eyebrow: 'Asukoht',
@@ -146,15 +202,15 @@ export const landing: Record<Locale, LandingCopy> = {
 			emailLabel: 'E-post',
 			mapCta: 'Ava Google Maps’is',
 		},
-		footer: { rights: 'Kõik õigused kaitstud.', poweredBy: 'Veebilehe lõi' },
-		languageModal: { heading: 'Vali keel', subheading: 'H&H apartments on saadaval 6 keeles.', continueLabel: 'Jätka' },
+		footer: { rights: 'Kõik õigused kaitstud.', poweredBy: 'Veebilehe lõi', regCode: 'Registrikood' },
+		languageModal: { heading: 'Vali keel', subheading: 'Hostel & Hotel Apartments on saadaval 6 keeles.', continueLabel: 'Jätka' },
 	},
 	uk: {
-		metaDescription: 'Hostel 3A від H&H apartments — приватні та спільні номери в Маарду, за кілька хвилин від Таллінна, з власним буфетом.',
-		nav: { about: 'Про нас', rooms: 'Номери', buffet: 'Буфет', location: 'Розташування', contact: 'Контакти', bookNow: 'Забронювати' },
+		metaDescription: 'Hostel 3A від Hostel & Hotel Apartments — приватні та спільні номери в Маарду, за кілька хвилин від Таллінна, з власним буфетом.',
+		nav: { about: 'Про нас', rooms: 'Номери', pricing: 'Ціни', buffet: 'Буфет', location: 'Розташування', contact: 'Контакти', bookNow: 'Забронювати' },
 		hero: {
-			eyebrow: 'Маарду, Естонія',
-			heading: 'H&H apartments — Hostel 3A',
+			eyebrow: 'Hostel 3A · Маарду, Естонія',
+			heading: 'Hostel & Hotel Apartments',
 			subheading: 'Затишні приватні та спільні номери неподалік Таллінна, з власним буфетом і тихим місцем для роботи чи відпочинку.',
 			ctaBook: 'Забронювати на Booking.com',
 			ctaContact: "Зв'язатися з нами",
@@ -178,6 +234,24 @@ export const landing: Record<Locale, LandingCopy> = {
 				dining: { title: 'Їдальня', caption: 'Спільний стіл для сніданку чи вечері.' },
 			},
 		},
+		pricing: {
+			eyebrow: 'Ціни',
+			heading: 'Тарифи',
+			subheading: 'Бронюйте подобово або заощаджуйте з тижневим / двотижневим пакетом.',
+			categoryShared: 'Спільна кімната',
+			categoryFamily: 'Сімейний номер',
+			colPerNight: 'За добу',
+			colPerMonth: 'За місяць (30 діб)',
+			colWeek: 'Тиждень (7 діб)',
+			colTwoWeeks: '2 тижні (14 діб)',
+			save: 'Економія',
+			perDay: '/ добу',
+			vatExcluded: 'Ціни вказані без ПДВ (13%).',
+			vatIncluded: 'з ПДВ:',
+			termsHeading: 'Умови бронювання',
+			termsPrepay: 'Пакети на тиждень / 2 тижні / місяць вимагають 100% передоплати при заселенні.',
+			termsEarlyCheckout: 'Дострокове виселення скасовує знижку пакета — проживання перераховується за стандартним тарифом за добу.',
+		},
 		buffet: {
 			eyebrow: 'Pagari Buffet',
 			heading: 'Домашня кухня на першому поверсі',
@@ -190,6 +264,7 @@ export const landing: Record<Locale, LandingCopy> = {
 			subheading: 'Незабаром тут з\'явиться живий рейтинг — а поки що дивіться свіжі відгуки прямо на Booking.com.',
 			bookingCta: 'Читати відгуки на Booking.com',
 			googleCta: 'Знайти нас у Google',
+			recentGuestsLabel: 'Останні гості на Booking.com',
 		},
 		location: {
 			eyebrow: 'Розташування',
@@ -200,15 +275,15 @@ export const landing: Record<Locale, LandingCopy> = {
 			emailLabel: 'Email',
 			mapCta: 'Відкрити в Google Maps',
 		},
-		footer: { rights: 'Усі права захищені.', poweredBy: 'Сайт розробив' },
-		languageModal: { heading: 'Оберіть мову', subheading: 'H&H apartments доступний 6 мовами.', continueLabel: 'Продовжити' },
+		footer: { rights: 'Усі права захищені.', poweredBy: 'Сайт розробив', regCode: 'Реєстраційний код' },
+		languageModal: { heading: 'Оберіть мову', subheading: 'Hostel & Hotel Apartments доступний 6 мовами.', continueLabel: 'Продовжити' },
 	},
 	ru: {
-		metaDescription: 'Hostel 3A от H&H apartments — частные и общие номера в Маарду, в нескольких минутах от Таллинна, с собственным буфетом.',
-		nav: { about: 'О нас', rooms: 'Номера', buffet: 'Буфет', location: 'Расположение', contact: 'Контакты', bookNow: 'Забронировать' },
+		metaDescription: 'Hostel 3A от Hostel & Hotel Apartments — частные и общие номера в Маарду, в нескольких минутах от Таллинна, с собственным буфетом.',
+		nav: { about: 'О нас', rooms: 'Номера', pricing: 'Цены', buffet: 'Буфет', location: 'Расположение', contact: 'Контакты', bookNow: 'Забронировать' },
 		hero: {
-			eyebrow: 'Маарду, Эстония',
-			heading: 'H&H apartments — Hostel 3A',
+			eyebrow: 'Hostel 3A · Маарду, Эстония',
+			heading: 'Hostel & Hotel Apartments',
 			subheading: 'Уютные частные и общие номера рядом с Таллинном, с собственным буфетом и тихим местом для работы или отдыха.',
 			ctaBook: 'Забронировать на Booking.com',
 			ctaContact: 'Связаться с нами',
@@ -232,6 +307,24 @@ export const landing: Record<Locale, LandingCopy> = {
 				dining: { title: 'Столовая', caption: 'Общий стол для завтрака или ужина.' },
 			},
 		},
+		pricing: {
+			eyebrow: 'Цены',
+			heading: 'Тарифы',
+			subheading: 'Бронируйте посуточно или экономьте с недельным / двухнедельным пакетом.',
+			categoryShared: 'Общий номер',
+			categoryFamily: 'Семейный номер',
+			colPerNight: 'За сутки',
+			colPerMonth: 'За месяц (30 суток)',
+			colWeek: 'Неделя (7 суток)',
+			colTwoWeeks: '2 недели (14 суток)',
+			save: 'Экономия',
+			perDay: '/ сутки',
+			vatExcluded: 'Цены указаны без НДС (13%).',
+			vatIncluded: 'с НДС:',
+			termsHeading: 'Условия бронирования',
+			termsPrepay: 'Пакеты на неделю / 2 недели / месяц требуют 100% предоплаты при заселении.',
+			termsEarlyCheckout: 'Досрочный выезд аннулирует скидку пакета — проживание пересчитывается по стандартному суточному тарифу.',
+		},
 		buffet: {
 			eyebrow: 'Pagari Buffet',
 			heading: 'Домашняя кухня на первом этаже',
@@ -244,6 +337,7 @@ export const landing: Record<Locale, LandingCopy> = {
 			subheading: 'Скоро здесь появится живой рейтинг — а пока смотрите свежие отзывы прямо на Booking.com.',
 			bookingCta: 'Читать отзывы на Booking.com',
 			googleCta: 'Найти нас в Google',
+			recentGuestsLabel: 'Недавние гости на Booking.com',
 		},
 		location: {
 			eyebrow: 'Расположение',
@@ -254,15 +348,15 @@ export const landing: Record<Locale, LandingCopy> = {
 			emailLabel: 'Email',
 			mapCta: 'Открыть в Google Maps',
 		},
-		footer: { rights: 'Все права защищены.', poweredBy: 'Сайт создан в' },
-		languageModal: { heading: 'Выберите язык', subheading: 'H&H apartments доступен на 6 языках.', continueLabel: 'Продолжить' },
+		footer: { rights: 'Все права защищены.', poweredBy: 'Сайт создан в', regCode: 'Рег. код' },
+		languageModal: { heading: 'Выберите язык', subheading: 'Hostel & Hotel Apartments доступен на 6 языках.', continueLabel: 'Продолжить' },
 	},
 	lv: {
-		metaDescription: 'Hostel 3A no H&H apartments — privātas un kopīgas istabas Maardu, dažu minūšu attālumā no Tallinas, ar savu bufeti.',
-		nav: { about: 'Par mums', rooms: 'Istabas', buffet: 'Bufete', location: 'Atrašanās vieta', contact: 'Kontakti', bookNow: 'Rezervēt' },
+		metaDescription: 'Hostel 3A no Hostel & Hotel Apartments — privātas un kopīgas istabas Maardu, dažu minūšu attālumā no Tallinas, ar savu bufeti.',
+		nav: { about: 'Par mums', rooms: 'Istabas', pricing: 'Cenas', buffet: 'Bufete', location: 'Atrašanās vieta', contact: 'Kontakti', bookNow: 'Rezervēt' },
 		hero: {
-			eyebrow: 'Maardu, Igaunija',
-			heading: 'H&H apartments — Hostel 3A',
+			eyebrow: 'Hostel 3A · Maardu, Igaunija',
+			heading: 'Hostel & Hotel Apartments',
 			subheading: 'Ērtas privātas un kopīgas istabas netālu no Tallinas, ar savu bufeti un klusu vietu darbam vai atpūtai.',
 			ctaBook: 'Rezervēt Booking.com',
 			ctaContact: 'Sazinieties ar mums',
@@ -286,6 +380,24 @@ export const landing: Record<Locale, LandingCopy> = {
 				dining: { title: 'Ēdamzona', caption: 'Kopīgs galds brokastīm vai vakariņām.' },
 			},
 		},
+		pricing: {
+			eyebrow: 'Cenas',
+			heading: 'Cenrādis',
+			subheading: 'Rezervējiet pa naktīm vai ietaupiet ar nedēļas / divu nedēļu paketi.',
+			categoryShared: 'Kopīga istaba',
+			categoryFamily: 'Ģimenes istaba',
+			colPerNight: 'Par nakti',
+			colPerMonth: 'Par mēnesi (30 naktis)',
+			colWeek: 'Nedēļa (7 naktis)',
+			colTwoWeeks: '2 nedēļas (14 naktis)',
+			save: 'Ietaupījums',
+			perDay: '/ nakts',
+			vatExcluded: 'Cenas norādītas bez PVN (13%).',
+			vatIncluded: 'ar PVN:',
+			termsHeading: 'Rezervācijas noteikumi',
+			termsPrepay: 'Nedēļas / 2 nedēļu / mēneša paketēm nepieciešama 100% priekšapmaksa iereģistrējoties.',
+			termsEarlyCheckout: 'Agrāka izbraukšana anulē paketes atlaidi — uzturēšanās tiek pārrēķināta pēc standarta nakts tarifa.',
+		},
 		buffet: {
 			eyebrow: 'Pagari Buffet',
 			heading: 'Mājas virtuve pirmajā stāvā',
@@ -298,6 +410,7 @@ export const landing: Record<Locale, LandingCopy> = {
 			subheading: 'Drīz šeit būs tiešs vērtējums — pagaidām skatiet jaunākās atsauksmes tieši Booking.com.',
 			bookingCta: 'Lasīt atsauksmes Booking.com',
 			googleCta: 'Atrodiet mūs Google',
+			recentGuestsLabel: 'Nesenie viesi Booking.com',
 		},
 		location: {
 			eyebrow: 'Atrašanās vieta',
@@ -308,15 +421,15 @@ export const landing: Record<Locale, LandingCopy> = {
 			emailLabel: 'E-pasts',
 			mapCta: 'Atvērt Google Maps',
 		},
-		footer: { rights: 'Visas tiesības aizsargātas.', poweredBy: 'Mājaslapu izveidoja' },
-		languageModal: { heading: 'Izvēlieties valodu', subheading: 'H&H apartments pieejams 6 valodās.', continueLabel: 'Turpināt' },
+		footer: { rights: 'Visas tiesības aizsargātas.', poweredBy: 'Mājaslapu izveidoja', regCode: 'Reģ. kods' },
+		languageModal: { heading: 'Izvēlieties valodu', subheading: 'Hostel & Hotel Apartments pieejams 6 valodās.', continueLabel: 'Turpināt' },
 	},
 	fi: {
-		metaDescription: 'Hostel 3A, H&H apartments — yksityisiä ja jaettuja huoneita Maardussa, minuuttien päässä Tallinnasta, oma buffet paikan päällä.',
-		nav: { about: 'Meistä', rooms: 'Huoneet', buffet: 'Buffet', location: 'Sijainti', contact: 'Yhteystiedot', bookNow: 'Varaa nyt' },
+		metaDescription: 'Hostel 3A, Hostel & Hotel Apartments — yksityisiä ja jaettuja huoneita Maardussa, minuuttien päässä Tallinnasta, oma buffet paikan päällä.',
+		nav: { about: 'Meistä', rooms: 'Huoneet', pricing: 'Hinnat', buffet: 'Buffet', location: 'Sijainti', contact: 'Yhteystiedot', bookNow: 'Varaa nyt' },
 		hero: {
-			eyebrow: 'Maardu, Viro',
-			heading: 'H&H apartments — Hostel 3A',
+			eyebrow: 'Hostel 3A · Maardu, Viro',
+			heading: 'Hostel & Hotel Apartments',
 			subheading: 'Viihtyisiä yksityisiä ja jaettuja huoneita lähellä Tallinnaa, omalla buffetilla ja rauhallisella tilalla työntekoon tai lepoon.',
 			ctaBook: 'Varaa Booking.comissa',
 			ctaContact: 'Ota yhteyttä',
@@ -340,6 +453,24 @@ export const landing: Record<Locale, LandingCopy> = {
 				dining: { title: 'Ruokailutila', caption: 'Yhteinen pöytä aamiaiselle tai illalliselle.' },
 			},
 		},
+		pricing: {
+			eyebrow: 'Hinnat',
+			heading: 'Hinnasto',
+			subheading: 'Varaa yöltä tai säästä viikko- / kahden viikon paketilla.',
+			categoryShared: 'Jaettu huone',
+			categoryFamily: 'Perhehuone',
+			colPerNight: 'Yö',
+			colPerMonth: 'Kuukausi (30 yötä)',
+			colWeek: 'Viikko (7 yötä)',
+			colTwoWeeks: '2 viikkoa (14 yötä)',
+			save: 'Säästö',
+			perDay: '/ yö',
+			vatExcluded: 'Hinnat eivät sisällä ALV:tä (13%).',
+			vatIncluded: 'sis. ALV:',
+			termsHeading: 'Varausehdot',
+			termsPrepay: 'Viikko-, 2 viikon ja kuukausipaketit edellyttävät 100 % ennakkomaksua sisäänkirjautuessa.',
+			termsEarlyCheckout: 'Aikaisempi lähtö peruuttaa pakettialennuksen — oleskelu lasketaan uudelleen normaalilla yöhinnalla.',
+		},
 		buffet: {
 			eyebrow: 'Pagari Buffet',
 			heading: 'Kotiruokaa alakerrassa',
@@ -352,6 +483,7 @@ export const landing: Record<Locale, LandingCopy> = {
 			subheading: 'Reaaliaikainen arvosana lisätään pian — sitä odotellessa lue tuoreet arvostelut suoraan Booking.comista.',
 			bookingCta: 'Lue arvosteluja Booking.comissa',
 			googleCta: 'Löydä meidät Googlesta',
+			recentGuestsLabel: 'Viimeisimmät vieraat Booking.comissa',
 		},
 		location: {
 			eyebrow: 'Sijainti',
@@ -362,7 +494,7 @@ export const landing: Record<Locale, LandingCopy> = {
 			emailLabel: 'Sähköposti',
 			mapCta: 'Avaa Google Mapsissa',
 		},
-		footer: { rights: 'Kaikki oikeudet pidätetään.', poweredBy: 'Sivuston toteutti' },
-		languageModal: { heading: 'Valitse kieli', subheading: 'H&H apartments on saatavilla 6 kielellä.', continueLabel: 'Jatka' },
+		footer: { rights: 'Kaikki oikeudet pidätetään.', poweredBy: 'Sivuston toteutti', regCode: 'Rek. nro' },
+		languageModal: { heading: 'Valitse kieli', subheading: 'Hostel & Hotel Apartments on saatavilla 6 kielellä.', continueLabel: 'Jatka' },
 	},
 };

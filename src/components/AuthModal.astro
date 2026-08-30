@@ -1,0 +1,583 @@
+---
+// Двопанельна попап-модалка входу (референс-дизайн від користувача,
+// 2026-08-29, адаптовано під наш бренд — синій #0072CE замість
+// зелений/золота з референсу, наша піктограма-ліжко замість зірки).
+// Підключена глобально через BaseLayout. Тригер — [data-account-trigger]
+// (шапка сайту); скрипт вирішує відкрити модалку чи пропустити перехід на
+// /account, дивлячись на нечутливу мітку-cookie hha_signed_in (сама сесія
+// лишається httpOnly, тут її не читаємо).
+import type { Locale } from '../i18n/locales';
+import { account } from '../i18n/account';
+import Logo from './Logo.astro';
+
+interface Props {
+	locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = account[locale].login;
+const regCopy = account[locale].register;
+---
+
+<div class="auth-modal" id="auth-modal" hidden>
+	<a class="auth-modal__scrim" href="#" data-auth-close aria-label="Close"></a>
+	<div class="auth-modal__overlay" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+		<button type="button" class="auth-modal__close" data-auth-close aria-label="Close">
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+		</button>
+
+		<div class="auth-modal__brand">
+			<div class="auth-modal__brand-top">
+				<div class="loyalty-slot">
+					<svg class="lp-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M12 2l2.4 5.8 6.2.5-4.7 4.1 1.5 6.1L12 15.4 6.6 18.5l1.5-6.1-4.7-4.1 6.2-.5z" />
+					</svg>
+					<span class="lp-word">15 pts / night · 10 pts = €1</span>
+				</div>
+				<Logo size={44} />
+				<div class="auth-modal__brand-copy">
+					<h2>Sign in for your loyalty points</h2>
+					<p>See your points balance, book faster next time, and keep your details on file. Your data stays private.</p>
+				</div>
+			</div>
+			<div class="auth-modal__brand-foot">
+				<span class="dot"></span>
+				<span>Secure connection</span>
+			</div>
+		</div>
+
+		<div class="auth-modal__panel">
+			<p class="eyebrow-form">Hostel 3A</p>
+			<h1 id="auth-modal-title">{copy.title}</h1>
+			<p class="subtitle">Welcome back — choose how you'd like to sign in.</p>
+
+			<div class="social-row">
+				<button type="button" class="social-btn" disabled title="Coming soon">
+					<svg viewBox="0 0 24 24">
+						<path fill="#4285F4" d="M23.52 12.27c0-.82-.07-1.6-.2-2.36H12v4.47h6.47c-.28 1.5-1.13 2.78-2.4 3.63v3.02h3.88c2.27-2.09 3.57-5.17 3.57-8.76z" />
+						<path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.88-3.02c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.11C3.24 21.3 7.29 24 12 24z" />
+						<path fill="#FBBC05" d="M5.27 14.27c-.25-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27V6.62H1.26A11.97 11.97 0 0 0 0 12c0 1.93.46 3.76 1.26 5.38l4.01-3.11z" />
+						<path fill="#EA4335" d="M12 4.77c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.29 0 3.24 2.7 1.26 6.62l4.01 3.11C6.22 6.88 8.87 4.77 12 4.77z" />
+					</svg>
+					Google
+				</button>
+				<button type="button" class="social-btn" disabled title="Coming soon">
+					<svg viewBox="0 0 240 240">
+						<circle cx="120" cy="120" r="120" fill="#29A9EA" />
+						<path fill="#fff" d="M52 118l128-49c6-2 11 1 9 10l-22 103c-2 8-7 10-14 6l-38-28-18 17c-2 2-4 4-8 4l3-40 73-66c3-3-1-4-4-2l-90 57-39-12c-8-3-8-9 2-10z" />
+					</svg>
+					Telegram
+				</button>
+			</div>
+			<p class="oauth-note">Google &amp; Telegram sign-in — coming soon</p>
+
+			<div class="divider"><span>or by email</span></div>
+
+			<form method="POST" action={`/${locale}/account/login`} novalidate>
+				<div class="field">
+					<label for="auth-modal-email">{copy.email}</label>
+					<div class="input-wrap">
+						<input type="email" id="auth-modal-email" name="email" placeholder="you@example.com" autocomplete="email" required />
+						<span class="icon" aria-hidden="true">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h18v12H3z" /><path d="M3 7l9 6 9-6" /></svg>
+						</span>
+					</div>
+				</div>
+
+				<div class="field">
+					<label for="auth-modal-password">{copy.password}</label>
+					<div class="input-wrap">
+						<input type="password" id="auth-modal-password" name="password" placeholder="••••••••" autocomplete="current-password" required />
+						<button type="button" class="toggle-pass" data-toggle-pass aria-label="Show password">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" /><circle cx="12" cy="12" r="3" /></svg>
+						</button>
+					</div>
+				</div>
+
+				<div class="row-between">
+					<label class="remember">
+						<input type="checkbox" name="remember" />
+						Remember me
+					</label>
+					<a href={`/${locale}/account/forgot-password`} class="forgot-link">{copy.forgotPassword}</a>
+				</div>
+
+				<button type="submit" class="submit-btn">
+					{copy.submit}
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
+				</button>
+			</form>
+
+			<p class="signup">
+				{copy.noAccount} <a href={`/${locale}/account/register`}>{regCopy.submit}</a>
+			</p>
+		</div>
+	</div>
+</div>
+
+<script is:inline>
+	(function () {
+		var modal = document.getElementById('auth-modal');
+		if (!modal) return;
+
+		function isSignedIn() {
+			return document.cookie.split('; ').some(function (c) {
+				return c.indexOf('hha_signed_in=1') === 0;
+			});
+		}
+
+		function open() {
+			modal.hidden = false;
+			document.body.style.overflow = 'hidden';
+		}
+
+		function close() {
+			modal.hidden = true;
+			document.body.style.overflow = '';
+		}
+
+		// AccountModal (кабінет-попап) падає сюди, коли мітка-cookie каже
+		// "signed in", а реальна сесія вже протухла/скинута — замість
+		// викидати гостя на негарну повну сторінку логіну, показуємо той
+		// самий вхід-попап.
+		window.__hhaAuthModal = { open: open, close: close };
+
+		modal.querySelectorAll('[data-auth-close]').forEach(function (el) {
+			el.addEventListener('click', function (e) {
+				e.preventDefault();
+				close();
+			});
+		});
+
+		modal.querySelector('.auth-modal__scrim')?.addEventListener('click', function (e) {
+			e.preventDefault();
+			close();
+		});
+
+		document.addEventListener('keydown', function (e) {
+			if (e.key === 'Escape' && !modal.hidden) close();
+		});
+
+		var togglePass = modal.querySelector('[data-toggle-pass]');
+		var passInput = document.getElementById('auth-modal-password');
+		if (togglePass && passInput) {
+			togglePass.addEventListener('click', function () {
+				var isPass = passInput.type === 'password';
+				passInput.type = isPass ? 'text' : 'password';
+				togglePass.setAttribute('aria-label', isPass ? 'Hide password' : 'Show password');
+			});
+		}
+
+		// Делегування на document, а не querySelectorAll — цей скрипт рендериться
+		// в BaseLayout ДО <slot />, а сама кнопка "Мій кабінет" живе в
+		// SiteHeader всередині <slot /> і в DOM з'являється пізніше. Пряма
+		// підписка querySelectorAll(...).forEach(...) в момент виконання цього
+		// скрипта її просто не знаходила — жоден обробник не навішувався, і клік
+		// провалювався у звичайний перехід по посиланню (саме тому попап не
+		// відкривався навіть в інкогніто, без жодної кукі).
+		document.addEventListener('click', function (e) {
+			var trigger = e.target && e.target.closest && e.target.closest('[data-account-trigger]');
+			if (!trigger) return;
+			if (!isSignedIn()) {
+				e.preventDefault();
+				open();
+			}
+			// якщо signed in — це територія AccountModal
+		});
+	})();
+</script>
+
+<style>
+	.auth-modal:not([hidden]) {
+		position: fixed;
+		inset: 0;
+		z-index: 250;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 24px 16px;
+	}
+
+	.auth-modal__scrim {
+		position: absolute;
+		inset: 0;
+		background: rgba(11, 13, 16, 0.72);
+		backdrop-filter: blur(3px);
+	}
+
+	.auth-modal__overlay {
+		position: relative;
+		width: 100%;
+		max-width: 860px;
+		max-height: 92vh;
+		overflow-y: auto;
+		display: grid;
+		grid-template-columns: 1fr 1.15fr;
+		background: #fff;
+		border-radius: 20px;
+		box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.55);
+		animation: auth-modal-pop 0.18s ease;
+	}
+
+	@keyframes auth-modal-pop {
+		from {
+			opacity: 0;
+			transform: translateY(12px) scale(0.98);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+		}
+	}
+
+	.auth-modal__close {
+		position: absolute;
+		top: 14px;
+		right: 14px;
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		border: none;
+		background: rgba(255, 255, 255, 0.15);
+		color: #fff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		z-index: 5;
+	}
+
+	.auth-modal__close svg {
+		width: 15px;
+		height: 15px;
+	}
+
+	.auth-modal__close:hover {
+		background: rgba(255, 255, 255, 0.28);
+	}
+
+	/* Brand panel */
+	.auth-modal__brand {
+		position: relative;
+		background: linear-gradient(165deg, var(--bg-dark) 0%, #060708 100%);
+		color: var(--cream);
+		padding: 2.5rem 2rem;
+		display: flex;
+		flex-direction: column;
+		justify-content: space-between;
+		overflow: hidden;
+	}
+
+	.auth-modal__brand-top {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		gap: 1.4rem;
+	}
+
+	.loyalty-slot {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.45rem 0.85rem;
+		border-radius: 999px;
+		border: 1px solid rgba(245, 245, 243, 0.28);
+		background: rgba(245, 245, 243, 0.06);
+		width: fit-content;
+	}
+
+	.lp-star {
+		width: 13px;
+		height: 13px;
+		color: var(--accent);
+		flex-shrink: 0;
+	}
+
+	.lp-word {
+		font-size: 0.72rem;
+		font-weight: 600;
+		color: var(--cream-muted);
+		white-space: nowrap;
+	}
+
+	.auth-modal__brand-copy h2 {
+		font-family: var(--font-display);
+		font-size: 1.5rem;
+		font-weight: 600;
+		line-height: 1.28;
+		margin: 0 0 0.6rem;
+		color: var(--cream);
+	}
+
+	.auth-modal__brand-copy p {
+		margin: 0;
+		font-size: 0.82rem;
+		line-height: 1.6;
+		color: var(--cream-muted);
+	}
+
+	.auth-modal__brand-foot {
+		position: relative;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.72rem;
+		color: var(--muted);
+	}
+
+	.auth-modal__brand-foot .dot {
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		background: var(--accent);
+	}
+
+	/* Form panel */
+	.auth-modal__panel {
+		padding: 2.25rem 2rem 1.75rem;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.eyebrow-form {
+		font-size: 0.7rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--accent);
+		font-weight: 700;
+		margin: 0 0 0.4rem;
+	}
+
+	.auth-modal__panel h1 {
+		font-family: var(--font-display);
+		font-size: 1.6rem;
+		font-weight: 600;
+		margin: 0 0 0.3rem;
+		color: var(--text-dark);
+	}
+
+	.subtitle {
+		margin: 0 0 1.4rem;
+		font-size: 0.85rem;
+		color: var(--text-dark-muted);
+	}
+
+	.social-row {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.7rem;
+		margin-bottom: 1.1rem;
+	}
+
+	.social-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		height: 42px;
+		border-radius: 0.6rem;
+		border: 1px solid var(--border-light);
+		background: #fff;
+		font-size: 0.82rem;
+		font-weight: 600;
+		color: var(--text-dark);
+		cursor: not-allowed;
+		opacity: 0.55;
+	}
+
+	.social-btn svg {
+		width: 17px;
+		height: 17px;
+		flex-shrink: 0;
+	}
+
+	.oauth-note {
+		margin: 0 0 1rem;
+		text-align: center;
+		font-size: 0.7rem;
+		color: var(--text-dark-muted);
+	}
+
+	.divider {
+		display: flex;
+		align-items: center;
+		gap: 0.7rem;
+		margin: 0 0 1.2rem;
+		color: var(--text-dark-muted);
+		font-size: 0.72rem;
+	}
+
+	.divider::before,
+	.divider::after {
+		content: '';
+		flex: 1;
+		height: 1px;
+		background: var(--border-light);
+	}
+
+	form {
+		display: flex;
+		flex-direction: column;
+		gap: 0.95rem;
+	}
+
+	.field label {
+		display: block;
+		font-size: 0.75rem;
+		font-weight: 700;
+		color: var(--text-dark-muted);
+		margin-bottom: 0.35rem;
+	}
+
+	.input-wrap {
+		position: relative;
+	}
+
+	.input-wrap input {
+		width: 100%;
+		height: 2.7rem;
+		border-radius: 0.6rem;
+		border: 1px solid var(--border-light);
+		background: var(--bg-light);
+		padding: 0 2.5rem 0 0.85rem;
+		font-size: 0.85rem;
+		color: var(--text-dark);
+		outline: none;
+		transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+	}
+
+	.input-wrap input:focus {
+		border-color: var(--accent);
+		background: #fff;
+		box-shadow: 0 0 0 3px rgba(0, 114, 206, 0.14);
+	}
+
+	.input-wrap .icon,
+	.toggle-pass {
+		position: absolute;
+		right: 0.75rem;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 1.1rem;
+		height: 1.1rem;
+		color: var(--muted);
+		pointer-events: none;
+	}
+
+	.input-wrap .icon svg {
+		width: 100%;
+		height: 100%;
+	}
+
+	.toggle-pass {
+		background: none;
+		border: none;
+		cursor: pointer;
+		padding: 0;
+		pointer-events: auto;
+	}
+
+	.toggle-pass svg {
+		width: 100%;
+		height: 100%;
+	}
+
+	.toggle-pass:hover {
+		color: var(--text-dark);
+	}
+
+	.row-between {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		font-size: 0.78rem;
+		margin-top: -0.2rem;
+	}
+
+	.remember {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		color: var(--text-dark-muted);
+		cursor: pointer;
+		user-select: none;
+	}
+
+	.remember input {
+		width: 0.9rem;
+		height: 0.9rem;
+		accent-color: var(--accent);
+		cursor: pointer;
+	}
+
+	.forgot-link {
+		color: var(--accent);
+		text-decoration: none;
+		font-weight: 600;
+	}
+
+	.forgot-link:hover {
+		text-decoration: underline;
+	}
+
+	.submit-btn {
+		margin-top: 0.3rem;
+		height: 2.8rem;
+		border: none;
+		border-radius: 0.6rem;
+		background: var(--bg-dark);
+		color: var(--cream);
+		font-size: 0.85rem;
+		font-weight: 700;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		transition: background 0.15s ease, transform 0.15s ease;
+	}
+
+	.submit-btn svg {
+		width: 15px;
+		height: 15px;
+	}
+
+	.submit-btn:hover {
+		background: #000;
+	}
+
+	.submit-btn:active {
+		transform: scale(0.985);
+	}
+
+	.signup {
+		margin-top: 1.4rem;
+		text-align: center;
+		font-size: 0.8rem;
+		color: var(--text-dark-muted);
+	}
+
+	.signup a {
+		color: var(--accent);
+		font-weight: 700;
+		text-decoration: none;
+	}
+
+	.signup a:hover {
+		text-decoration: underline;
+	}
+
+	@media (max-width: 700px) {
+		.auth-modal__overlay {
+			grid-template-columns: 1fr;
+		}
+
+		.auth-modal__brand {
+			display: none;
+		}
+
+		.auth-modal__panel {
+			padding: 2.5rem 1.5rem 1.75rem;
+		}
+	}
+</style>

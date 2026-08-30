@@ -21,7 +21,7 @@ export const comingSoon: Record<Locale, ComingSoonCopy> = {
 		units: { days: 'Days', hours: 'Hours', minutes: 'Minutes', seconds: 'Seconds' },
 		contactLabel: 'Contact us',
 		poweredBy: 'Website by',
-		metaDescription: 'H&H apartments — modern apartments in Estonia. Our new website is launching soon.',
+		metaDescription: 'Hostel & Hotel Apartments — modern apartments in Estonia. Our new website is launching soon.',
 	},
 	et: {
 		tagline: 'Moodsad korterid Eestis',
@@ -30,7 +30,7 @@ export const comingSoon: Record<Locale, ComingSoonCopy> = {
 		units: { days: 'Päeva', hours: 'Tundi', minutes: 'Minutit', seconds: 'Sekundit' },
 		contactLabel: 'Võta ühendust',
 		poweredBy: 'Veebilehe lõi',
-		metaDescription: 'H&H apartments — moodsad korterid Eestis. Meie uus veebileht avatakse peatselt.',
+		metaDescription: 'Hostel & Hotel Apartments — moodsad korterid Eestis. Meie uus veebileht avatakse peatselt.',
 	},
 	uk: {
 		tagline: 'Сучасні апартаменти в Естонії',
@@ -39,7 +39,7 @@ export const comingSoon: Record<Locale, ComingSoonCopy> = {
 		units: { days: 'Днів', hours: 'Годин', minutes: 'Хвилин', seconds: 'Секунд' },
 		contactLabel: "Зв'язатися з нами",
 		poweredBy: 'Сайт розробив',
-		metaDescription: 'H&H apartments — сучасні апартаменти в Естонії. Наш новий сайт скоро запрацює.',
+		metaDescription: 'Hostel & Hotel Apartments — сучасні апартаменти в Естонії. Наш новий сайт скоро запрацює.',
 	},
 	ru: {
 		tagline: 'Современные апартаменты в Эстонии',
@@ -48,7 +48,7 @@ export const comingSoon: Record<Locale, ComingSoonCopy> = {
 		units: { days: 'Дней', hours: 'Часов', minutes: 'Минут', seconds: 'Секунд' },
 		contactLabel: 'Связаться с нами',
 		poweredBy: 'Сайт создан в',
-		metaDescription: 'H&H apartments — современные апартаменты в Эстонии. Новый сайт скоро заработает.',
+		metaDescription: 'Hostel & Hotel Apartments — современные апартаменты в Эстонии. Новый сайт скоро заработает.',
 	},
 	lv: {
 		tagline: 'Mūsdienīgi apartamenti Igaunijā',
@@ -57,7 +57,7 @@ export const comingSoon: Record<Locale, ComingSoonCopy> = {
 		units: { days: 'Dienas', hours: 'Stundas', minutes: 'Minūtes', seconds: 'Sekundes' },
 		contactLabel: 'Sazinieties ar mums',
 		poweredBy: 'Mājaslapu izveidoja',
-		metaDescription: 'H&H apartments — mūsdienīgi apartamenti Igaunijā. Jaunā mājaslapa drīz būs pieejama.',
+		metaDescription: 'Hostel & Hotel Apartments — mūsdienīgi apartamenti Igaunijā. Jaunā mājaslapa drīz būs pieejama.',
 	},
 	fi: {
 		tagline: 'Moderneja huoneistoja Virossa',
@@ -66,7 +66,7 @@ export const comingSoon: Record<Locale, ComingSoonCopy> = {
 		units: { days: 'Päivää', hours: 'Tuntia', minutes: 'Minuuttia', seconds: 'Sekuntia' },
 		contactLabel: 'Ota yhteyttä',
 		poweredBy: 'Sivuston toteutti',
-		metaDescription: 'H&H apartments — moderneja huoneistoja Virossa. Uusi verkkosivusto avataan pian.',
+		metaDescription: 'Hostel & Hotel Apartments — moderneja huoneistoja Virossa. Uusi verkkosivusto avataan pian.',
 	},
 };
 

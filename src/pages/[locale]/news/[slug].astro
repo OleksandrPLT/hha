@@ -1,0 +1,124 @@
+---
+// SSR глобально ввімкнено (Фаза 2+ потребує його), але ця сторінка суто
+// контентна — статика швидша й простіша, тож примусово prerender. (Під час
+// тех-режиму з паролем цей та інші prerender=true файли тимчасово
+// перемикаються на false скриптом scripts/build-maintenance.sh — Astro
+// вимагає, щоб сам export був статичним літералом, імпорт змінної сюди не
+// підходить, перевірено емпірично 2026-08-30.)
+export const prerender = true;
+import { Image } from 'astro:assets';
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import SiteHeader from '../../../components/SiteHeader.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import { htmlLang, type Locale } from '../../../i18n/locales';
+import { newsCopy } from '../../../i18n/news';
+import { newsImages } from '../../../data/news-images';
+
+export async function getStaticPaths() {
+	const allPosts = await getCollection('news');
+	return allPosts.map((post) => ({
+		params: {
+			locale: post.data.locale,
+			slug: post.id.replace(new RegExp(`-${post.data.locale}$`), ''),
+		},
+		props: { post },
+	}));
+}
+
+const { locale } = Astro.params as { locale: Locale };
+const { post } = Astro.props as { post: Awaited<ReturnType<typeof getCollection<'news'>>>[number] };
+const copy = newsCopy[locale];
+const { Content } = await render(post);
+
+const dateFormatter = new Intl.DateTimeFormat(htmlLang[locale], { year: 'numeric', month: 'long', day: 'numeric' });
+---
+
+<BaseLayout locale={locale} title={`${post.data.title} — Hostel & Hotel Apartments`} description={post.data.excerpt} path={`/news/${Astro.params.slug}`}>
+	<SiteHeader locale={locale} />
+
+	<main class="section section--light">
+		<div class="container">
+			<a class="back-link" href={`/${locale}/news`}>{copy.backToNews}</a>
+			<div class="hero-img">
+				<Image src={newsImages[post.data.image]} alt={post.data.title} width={1000} loading="eager" />
+			</div>
+			<time datetime={post.data.date.toISOString()}>{dateFormatter.format(post.data.date)}</time>
+			<h1>{post.data.title}</h1>
+			<div class="prose">
+				<Content />
+			</div>
+		</div>
+	</main>
+
+	<SiteFooter locale={locale} />
+
+	<style>
+		.section--light {
+			background: var(--bg-light);
+			color: var(--text-dark);
+			padding: clamp(3rem, 6vw, 5rem) 0;
+		}
+
+		.container {
+			max-width: 42rem;
+			margin: 0 auto;
+			padding: 0 1.25rem;
+		}
+
+		.back-link {
+			display: inline-block;
+			margin-bottom: 1.5rem;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+			text-decoration: none;
+		}
+
+		.back-link:hover {
+			color: var(--accent);
+		}
+
+		.hero-img {
+			margin: 0 0 1.5rem;
+			border-radius: 1rem;
+			overflow: hidden;
+			aspect-ratio: 16 / 9;
+		}
+
+		.hero-img :global(img) {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+			display: block;
+		}
+
+		time {
+			display: block;
+			font-size: 0.78rem;
+			color: var(--text-dark-muted);
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
+			margin-bottom: 0.5rem;
+		}
+
+		h1 {
+			font-family: var(--font-display);
+			margin: 0 0 1.5rem;
+			font-size: clamp(1.75rem, 4vw, 2.25rem);
+			font-weight: 600;
+		}
+
+		.prose {
+			line-height: 1.7;
+			color: var(--text-dark-muted);
+		}
+
+		.prose :global(p) {
+			margin: 0 0 1rem;
+		}
+
+		.prose :global(a) {
+			color: var(--accent);
+		}
+	</style>
+</BaseLayout>

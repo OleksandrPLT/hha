@@ -1,0 +1,181 @@
+---
+// SSR глобально ввімкнено (Фаза 2+ потребує його), але ця сторінка суто
+// контентна — статика швидша й простіша, тож примусово prerender. (Під час
+// тех-режиму з паролем цей та інші prerender=true файли тимчасово
+// перемикаються на false скриптом scripts/build-maintenance.sh — Astro
+// вимагає, щоб сам export був статичним літералом, імпорт змінної сюди не
+// підходить, перевірено емпірично 2026-08-30.)
+export const prerender = true;
+import { Image } from 'astro:assets';
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import SiteHeader from '../../../components/SiteHeader.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import { locales, htmlLang, type Locale } from '../../../i18n/locales';
+import { newsCopy } from '../../../i18n/news';
+import { newsImages } from '../../../data/news-images';
+
+export function getStaticPaths() {
+	return locales.map((locale) => ({ params: { locale } }));
+}
+
+const { locale } = Astro.params as { locale: Locale };
+const copy = newsCopy[locale];
+
+const posts = (await getCollection('news', (entry) => entry.data.locale === locale)).sort(
+	(a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
+
+function slugFor(id: string) {
+	return id.replace(new RegExp(`-${locale}$`), '');
+}
+
+const dateFormatter = new Intl.DateTimeFormat(htmlLang[locale], { year: 'numeric', month: 'long', day: 'numeric' });
+---
+
+<BaseLayout locale={locale} title={`${copy.heading} — Hostel & Hotel Apartments`} description={copy.metaDescription} path="/news">
+	<SiteHeader locale={locale} />
+
+	<main class="section section--light">
+		<div class="container">
+			<h1>{copy.heading}</h1>
+			<p class="subheading">{copy.subheading}</p>
+
+			{posts.length === 0 && <p class="empty">{copy.empty}</p>}
+
+			<div class="post-list">
+				{
+					posts.map((post) => (
+						<a class="post-card" href={`/${locale}/news/${slugFor(post.id)}`}>
+							<div class="post-card__img">
+								<Image src={newsImages[post.data.image]} alt={post.data.title} width={500} loading="lazy" />
+							</div>
+							<div class="post-card__body">
+								<time datetime={post.data.date.toISOString()}>{dateFormatter.format(post.data.date)}</time>
+								<h2>{post.data.title}</h2>
+								<p>{post.data.excerpt}</p>
+								<span class="read-more">{copy.readMore} →</span>
+							</div>
+						</a>
+					))
+				}
+			</div>
+		</div>
+	</main>
+
+	<SiteFooter locale={locale} />
+
+	<style>
+		.section--light {
+			background: var(--bg-light);
+			color: var(--text-dark);
+			padding: clamp(3rem, 6vw, 5rem) 0;
+			min-height: 40vh;
+		}
+
+		.container {
+			max-width: 54rem;
+			margin: 0 auto;
+			padding: 0 1.25rem;
+		}
+
+		h1 {
+			font-family: var(--font-display);
+			margin: 0 0 0.5rem;
+			font-size: clamp(1.75rem, 4vw, 2.5rem);
+			font-weight: 600;
+		}
+
+		.subheading {
+			margin: 0 0 2.5rem;
+			color: var(--text-dark-muted);
+		}
+
+		.empty {
+			color: var(--text-dark-muted);
+		}
+
+		.post-list {
+			display: flex;
+			flex-direction: column;
+			gap: 1.5rem;
+		}
+
+		.post-card {
+			display: grid;
+			grid-template-columns: 14rem 1fr;
+			overflow: hidden;
+			border: 1px solid var(--border-light);
+			border-radius: 1rem;
+			text-decoration: none;
+			color: inherit;
+			background: #fff;
+			transition: border-color 0.15s ease, transform 0.15s ease;
+		}
+
+		.post-card:hover {
+			border-color: var(--accent);
+			transform: translateY(-2px);
+		}
+
+		.post-card__img {
+			overflow: hidden;
+		}
+
+		.post-card__img :global(img) {
+			width: 100%;
+			height: 100%;
+			min-height: 10rem;
+			object-fit: cover;
+			display: block;
+			transition: transform 0.3s ease;
+		}
+
+		.post-card:hover .post-card__img :global(img) {
+			transform: scale(1.04);
+		}
+
+		.post-card__body {
+			padding: 1.5rem;
+			display: flex;
+			flex-direction: column;
+		}
+
+		.post-card time {
+			font-size: 0.78rem;
+			color: var(--text-dark-muted);
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
+		}
+
+		.post-card h2 {
+			margin: 0.4rem 0 0.5rem;
+			font-size: 1.2rem;
+			font-weight: 700;
+		}
+
+		.post-card p {
+			margin: 0 0 0.75rem;
+			color: var(--text-dark-muted);
+			line-height: 1.55;
+		}
+
+		.read-more {
+			font-size: 0.85rem;
+			font-weight: 600;
+			color: var(--accent);
+			margin-top: auto;
+		}
+
+		@media (max-width: 640px) {
+			.post-card {
+				grid-template-columns: 1fr;
+			}
+
+			.post-card__img :global(img) {
+				aspect-ratio: 16 / 9;
+				min-height: 0;
+			}
+		}
+	</style>
+</BaseLayout>

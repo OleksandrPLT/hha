@@ -1,0 +1,112 @@
+---
+// SSR глобально ввімкнено (Фаза 2+ потребує його), але ця сторінка суто
+// контентна — статика швидша й простіша, тож примусово prerender. (Під час
+// тех-режиму з паролем цей та інші prerender=true файли тимчасово
+// перемикаються на false скриптом scripts/build-maintenance.sh — Astro
+// вимагає, щоб сам export був статичним літералом, імпорт змінної сюди не
+// підходить, перевірено емпірично 2026-08-30.)
+export const prerender = true;
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import { locales, type Locale } from '../../i18n/locales';
+import { terms } from '../../i18n/terms';
+import { property } from '../../data/property';
+
+export function getStaticPaths() {
+	return locales.map((locale) => ({ params: { locale } }));
+}
+
+const { locale } = Astro.params as { locale: Locale };
+const copy = terms[locale];
+---
+
+<BaseLayout locale={locale} title={`${copy.title} — ${property.brand}`} description={copy.metaDescription} path="/terms">
+	<SiteHeader locale={locale} />
+
+	<main class="section section--light">
+		<div class="container">
+			<a class="back-link" href={`/${locale}`}>{copy.backLabel}</a>
+			<h1>{copy.title}</h1>
+			<p class="intro">{copy.intro}</p>
+
+			{
+				copy.sections.map((s) => (
+					<section class="policy-section">
+						<h2>{s.heading}</h2>
+						{s.body.map((p) => (
+							<p>{p}</p>
+						))}
+					</section>
+				))
+			}
+
+			<p class="last-updated">{copy.lastUpdated}</p>
+		</div>
+	</main>
+
+	<SiteFooter locale={locale} />
+
+	<style>
+		.section--light {
+			background: var(--bg-light);
+			color: var(--text-dark);
+			padding: clamp(3rem, 6vw, 5rem) 0;
+		}
+
+		.container {
+			max-width: 42rem;
+			margin: 0 auto;
+			padding: 0 1.25rem;
+		}
+
+		.back-link {
+			display: inline-block;
+			margin-bottom: 1.5rem;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+			text-decoration: none;
+		}
+
+		.back-link:hover {
+			color: var(--accent);
+		}
+
+		h1 {
+			font-family: var(--font-display);
+			margin: 0 0 1rem;
+			font-size: clamp(1.75rem, 4vw, 2.5rem);
+			font-weight: 600;
+		}
+
+		.intro {
+			color: var(--text-dark-muted);
+			line-height: 1.6;
+			margin-bottom: 2.5rem;
+		}
+
+		.policy-section {
+			margin-bottom: 2rem;
+		}
+
+		.policy-section h2 {
+			font-size: 1.1rem;
+			font-weight: 700;
+			margin: 0 0 0.6rem;
+		}
+
+		.policy-section p {
+			margin: 0 0 0.75rem;
+			line-height: 1.65;
+			color: var(--text-dark-muted);
+		}
+
+		.last-updated {
+			margin-top: 2.5rem;
+			font-size: 0.8rem;
+			color: var(--muted);
+			border-top: 1px solid var(--border-light);
+			padding-top: 1.25rem;
+		}
+	</style>
+</BaseLayout>

@@ -1,7 +1,7 @@
 ---
 // ТЗ §3: модальне вікно вибору мови при першому вході, до показу контенту.
 // Показується один раз на браузер (localStorage), незалежно від locale.
-import { locales, localeNames, type Locale } from '../i18n/locales';
+import { locales, localeNames, localeFlags, type Locale } from '../i18n/locales';
 import { landing } from '../i18n/landing';
 
 interface Props {
@@ -21,7 +21,7 @@ const copy = landing[locale].languageModal;
 			{
 				locales.map((l) => (
 					<a href={`/${l}`} class={`lang-modal__option ${l === locale ? 'is-current' : ''}`} data-lang-option data-locale={l}>
-						{localeNames[l]}
+						<span aria-hidden="true">{localeFlags[l]}</span> {localeNames[l]}
 					</a>
 				))
 			}

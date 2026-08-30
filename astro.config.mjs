@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
+import node from '@astrojs/node';
 
 const site = 'https://hha.ee';
 
@@ -31,15 +32,37 @@ export default defineConfig({
 				locales: Object.fromEntries(locales.map((l) => [l, l])),
 				defaultLocale,
 			},
+			// "/" — це лише JS-редирект-заглушка (визначає мову гостя і йде на
+			// /<locale>), не контентна сторінка — не варто її індексувати.
+			filter: (page) => new URL(page).pathname !== '/',
+			// @astrojs/sitemap не додає x-default сам — дописуємо вручну поруч з
+			// уже згенерованими per-locale hreflang-посиланнями. lastmod — час
+			// білда (для статичного лендінгу немає per-page дати оновлення).
+			serialize(item) {
+				const buildDate = new Date().toISOString();
+				const links = item.links ?? [];
+				const defaultLink = links.find((l) => l.lang === defaultLocale);
+				return {
+					...item,
+					lastmod: buildDate,
+					links: defaultLink ? [...links, { lang: 'x-default', url: defaultLink.url }] : links,
+				};
+			},
 		}),
 	],
 
-	// 2026-08-29: хостинг hha.ee виявився не VPS (як admin.intech.org.ua), а
-	// шаред-хостинг Zone.ee (ZoneOS) без systemd/cron/sudo — тримати живий
-	// Node SSR-процес там нема на чому. Поки що (Фаза 1, Coming Soon — без
-	// бекенду) свідомо відкат на 'static', деплой напряму в Apache-докрут.
-	// Коли дійдемо до кабінетів/бронювання (Фаза 2-4) — треба або знайти
-	// механізм Node-хостингу в панелі Zone.ee (Passenger?), або переносити
-	// проєкт на окремий VPS; тоді повернути output: 'server' + adapter node.
-	output: 'static',
+	// 2026-08-29: hha.ee — шаред-хостинг Zone.ee (ZoneOS), без systemd/cron.
+	// АЛЕ в панелі my.zone.eu є офіційна підтримка Node: "Webhosting → PM2
+	// and Node.js" (PM2 тримає процес живим) + "mod_proxy backend port" у
+	// налаштуваннях домену (Apache проксіює на порт застосунку). Тому
+	// гібридний рендеринг: 'server' глобально, а сторінки, яким SSR не
+	// потрібен (лендінг/privacy/terms/news) — самі позначені
+	// `export const prerender = true` і збираються як статичний HTML.
+	// Джерело: https://www.zone.eu/support/kb/installing-a-nodejs-application-on-a-zone-web-server/
+	// Див. пам'ять hha-hosting-infra.
+	output: 'server',
+
+	adapter: node({
+		mode: 'standalone',
+	}),
 });

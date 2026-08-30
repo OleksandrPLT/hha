@@ -1,0 +1,10 @@
+---
+import { isLocale, defaultLocale, type Locale } from '../../../i18n/locales';
+
+const rawLocale = Astro.params.locale;
+const locale: Locale = rawLocale && isLocale(rawLocale) ? rawLocale : defaultLocale;
+
+await Astro.session?.destroy();
+Astro.cookies.delete('hha_signed_in', { path: '/' });
+return Astro.redirect(`/${locale}`);
+---

@@ -1,6 +1,9 @@
 ---
 import '../styles/global.css';
 import { locales, htmlLang, type Locale } from '../i18n/locales';
+import ScrollTools from '../components/ScrollTools.astro';
+import AuthModal from '../components/AuthModal.astro';
+import AccountModal from '../components/AccountModal.astro';
 
 interface Props {
 	locale: Locale;
@@ -31,6 +34,10 @@ const defaultHref = `${Astro.site}en${cleanPath}`;
 		<title>{title}</title>
 		<meta name="description" content={description} />
 
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+
 		<link rel="canonical" href={canonical} />
 		{alternates.map(({ locale: l, href }) => <link rel="alternate" hreflang={l} href={href} />)}
 		<link rel="alternate" hreflang="x-default" href={defaultHref} />
@@ -49,6 +56,9 @@ const defaultHref = `${Astro.site}en${cleanPath}`;
 		{schema && <script is:inline type="application/ld+json" set:html={JSON.stringify(schema)} />}
 	</head>
 	<body>
+		<ScrollTools locale={locale} />
+		<AuthModal locale={locale} />
+		<AccountModal locale={locale} />
 		<slot />
 	</body>
 </html>

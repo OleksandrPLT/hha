@@ -1,0 +1,656 @@
+---
+// Попап особистого кабінету — за прямим проханням користувача 2026-08-30:
+// клік по "Мій кабінет", коли гість вже залогінений (мітка-cookie
+// hha_signed_in), більше НЕ веде на окрему сторінку /account — відкриває
+// попап поверх сайту, як і AuthModal для входу. Візуальна мова та структура
+// (двопанельний попап, лоялті-хіро картка, аватар з ініціалами, сітка
+// деталей акаунту) — за референс-макетом користувача (2026-08-29,
+// "Bonus Club"), адаптована під наш блакитний/темний бренд. Купони,
+// реферальну програму й історію покупок з референсу НЕ перенесено — цих
+// функцій у нас немає, і показувати їх було б вигадкою (див. пам'ять
+// hha-phase2-account). Дані самого гостя рендеряться на сторінці НЕ тут
+// (модалка глобальна й підключена навіть до статичних сторінок), а
+// підвантажуються клієнтським JS з /api/{locale}/account після відкриття.
+// Повна сторінка /account лишається — для прямих посилань і друку.
+import type { Locale } from '../i18n/locales';
+import { account } from '../i18n/account';
+
+interface Props {
+	locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = account[locale];
+const d = copy.dashboard;
+---
+
+<div
+	class="account-modal"
+	id="account-modal"
+	hidden
+	data-individual-label={copy.register.accountTypeIndividual}
+	data-company-label={copy.register.accountTypeCompany}
+	data-yes-label={d.yes}
+	data-no-label={d.no}
+	data-locale={locale}
+>
+	<a class="account-modal__scrim" href="#" data-account-modal-close aria-label="Close"></a>
+	<div class="account-modal__overlay" role="dialog" aria-modal="true" aria-labelledby="account-modal-title">
+		<button type="button" class="account-modal__close" data-account-modal-close aria-label="Close">
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+		</button>
+
+		<div class="account-modal__brand">
+			<div class="am-who">
+				<div class="am-avatar" data-field="initials">··</div>
+				<div>
+					<p class="am-name" data-field="fullName">···</p>
+					<p class="am-since">
+						{d.memberSince} <span data-field="memberSince">···</span>
+					</p>
+				</div>
+			</div>
+
+			<div class="am-loyalty">
+				<p class="am-loyalty__label">{d.loyaltyPoints}</p>
+				<p class="am-loyalty__points">
+					<span data-field="loyaltyPoints">0</span>
+					<span class="am-loyalty__euro">≈ €<span data-field="loyaltyEuros">0.00</span></span>
+				</p>
+				<p class="am-loyalty__note">{d.loyaltyNote}</p>
+			</div>
+
+			<form method="POST" action={`/${locale}/account/logout`} class="am-logout-form">
+				<button type="submit" class="am-logout">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+						><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg
+					>
+					{d.logout}
+				</button>
+			</form>
+		</div>
+
+		<div class="account-modal__panel">
+			<p class="eyebrow-form">Hostel 3A</p>
+			<h1 id="account-modal-title">{d.welcome}</h1>
+
+			<div class="am-stats">
+				<div class="am-stat">
+					<div class="am-stat__icon">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+							><path d="M20 7h-3V5a3 3 0 00-3-3h-4a3 3 0 00-3 3v2H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"></path><path
+								d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"></path></svg
+						>
+					</div>
+					<div>
+						<p class="am-stat__value" data-field="accountType">···</p>
+						<p class="am-stat__label">{d.accountType}</p>
+					</div>
+				</div>
+				<div class="am-stat">
+					<div class="am-stat__icon">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+							><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 7l9 6 9-6"></path></svg
+						>
+					</div>
+					<div>
+						<p class="am-stat__value am-stat__value--small" data-field="email">···</p>
+						<p class="am-stat__label">{copy.register.email}</p>
+					</div>
+				</div>
+				<div class="am-stat">
+					<div class="am-stat__icon">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+							><path
+								d="M22 16.92v3a2 2 0 01-2.18 2 19.8 19.8 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.8 19.8 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0122 16.92z"
+							></path></svg
+						>
+					</div>
+					<div>
+						<p class="am-stat__value" data-field="phone">···</p>
+						<p class="am-stat__label">{copy.register.phone}</p>
+					</div>
+				</div>
+			</div>
+
+			<div class="am-section">
+				<h2>{d.accountDetailsTitle}</h2>
+				<dl class="am-detail-grid">
+					<div data-row="nationality" hidden>
+						<dt>{copy.register.nationality}</dt>
+						<dd data-field="nationality"></dd>
+					</div>
+					<div data-row="dateOfBirth" hidden>
+						<dt>{copy.register.dateOfBirth}</dt>
+						<dd data-field="dateOfBirth"></dd>
+					</div>
+					<div data-row="addressLine" hidden>
+						<dt>{copy.register.address}</dt>
+						<dd data-field="addressLine"></dd>
+					</div>
+					<div data-row="city" hidden>
+						<dt>{copy.register.city}</dt>
+						<dd data-field="city"></dd>
+					</div>
+					<div data-row="postalCode" hidden>
+						<dt>{copy.register.postalCode}</dt>
+						<dd data-field="postalCode"></dd>
+					</div>
+					<div data-row="countryOfResidence" hidden>
+						<dt>{copy.register.countryOfResidence}</dt>
+						<dd data-field="countryOfResidence"></dd>
+					</div>
+					<div>
+						<dt>{copy.register.marketingConsent}</dt>
+						<dd data-field="marketingConsent"></dd>
+					</div>
+					<div data-row="companyName" hidden>
+						<dt>{copy.register.companyName}</dt>
+						<dd data-field="companyName"></dd>
+					</div>
+					<div data-row="companyRegCode" hidden>
+						<dt>{copy.register.companyRegCode}</dt>
+						<dd data-field="companyRegCode"></dd>
+					</div>
+					<div data-row="companyVat" hidden>
+						<dt>{copy.register.companyVat}</dt>
+						<dd data-field="companyVat"></dd>
+					</div>
+					<div data-row="companyAddress" hidden>
+						<dt>{copy.register.companyAddress}</dt>
+						<dd data-field="companyAddress"></dd>
+					</div>
+				</dl>
+			</div>
+
+			<div class="am-section">
+				<h2>{d.stayHistoryTitle}</h2>
+				<p class="am-empty">{d.stayHistoryEmpty}</p>
+			</div>
+
+			<a href={`/${locale}/account`} class="am-full-link">
+				{d.viewFullProfile}
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
+			</a>
+		</div>
+	</div>
+</div>
+
+<script is:inline>
+	(function () {
+		var modal = document.getElementById('account-modal');
+		if (!modal) return;
+
+		var loaded = false;
+		var locale = modal.dataset.locale || 'en';
+
+		function isSignedIn() {
+			return document.cookie.split('; ').some(function (c) {
+				return c.indexOf('hha_signed_in=1') === 0;
+			});
+		}
+
+		function setText(field, value) {
+			var el = modal.querySelector('[data-field="' + field + '"]');
+			if (el) el.textContent = value == null || value === '' ? '—' : value;
+		}
+
+		function setRow(row, value) {
+			var el = modal.querySelector('[data-row="' + row + '"]');
+			if (!el) return;
+			if (value) {
+				el.hidden = false;
+				var dd = el.querySelector('[data-field="' + row + '"]');
+				if (dd) dd.textContent = value;
+			} else {
+				el.hidden = true;
+			}
+		}
+
+		function load() {
+			fetch('/api/' + locale + '/account', { credentials: 'same-origin' })
+				.then(function (r) {
+					if (!r.ok) throw new Error('unauthorized');
+					return r.json();
+				})
+				.then(function (data) {
+					loaded = true;
+					setText('initials', data.initials);
+					setText('fullName', data.fullName);
+					setText('memberSince', data.memberSince);
+					setText('loyaltyPoints', data.loyaltyPoints);
+					setText('loyaltyEuros', data.loyaltyEuros);
+					setText('accountType', data.isCompany ? modal.dataset.companyLabel : modal.dataset.individualLabel);
+					setText('email', data.email);
+					setText('phone', data.phone);
+					setRow('nationality', data.nationality);
+					setRow('dateOfBirth', data.dateOfBirth);
+					setRow('addressLine', data.addressLine);
+					setRow('city', data.city);
+					setRow('postalCode', data.postalCode);
+					setRow('countryOfResidence', data.countryOfResidence);
+					setText('marketingConsent', data.marketingConsent ? modal.dataset.yesLabel : modal.dataset.noLabel);
+					setRow('companyName', data.isCompany ? data.companyName : null);
+					setRow('companyRegCode', data.isCompany ? data.companyRegCode : null);
+					setRow('companyVat', data.isCompany ? data.companyVat : null);
+					setRow('companyAddress', data.isCompany ? data.companyAddress : null);
+				})
+				.catch(function () {
+					// Мітка-cookie hha_signed_in каже "увійшов", але реальна httpOnly
+					// сесія вже протухла/скинута (напр. після рестарту dev-сервера) —
+					// чистимо застарілу мітку й показуємо popup входу замість того,
+					// щоб кидати гостя на окрему сторінку /account/login.
+					document.cookie = 'hha_signed_in=; Max-Age=0; path=/';
+					close();
+					if (window.__hhaAuthModal) {
+						window.__hhaAuthModal.open();
+					} else {
+						window.location.href = '/' + locale + '/account/login';
+					}
+				});
+		}
+
+		function open() {
+			modal.hidden = false;
+			document.body.style.overflow = 'hidden';
+			if (!loaded) load();
+		}
+
+		function close() {
+			modal.hidden = true;
+			document.body.style.overflow = '';
+		}
+
+		modal.querySelectorAll('[data-account-modal-close]').forEach(function (el) {
+			el.addEventListener('click', function (e) {
+				e.preventDefault();
+				close();
+			});
+		});
+
+		modal.querySelector('.account-modal__scrim')?.addEventListener('click', function (e) {
+			e.preventDefault();
+			close();
+		});
+
+		document.addEventListener('keydown', function (e) {
+			if (e.key === 'Escape' && !modal.hidden) close();
+		});
+
+		// Делегування на document, а не querySelectorAll — див. коментар в
+		// AuthModal.astro: цей скрипт рендериться до <slot />, а кнопка
+		// "Мій кабінет" з SiteHeader з'являється в DOM пізніше.
+		document.addEventListener('click', function (e) {
+			var trigger = e.target && e.target.closest && e.target.closest('[data-account-trigger]');
+			if (!trigger) return;
+			if (isSignedIn()) {
+				e.preventDefault();
+				open();
+			}
+			// якщо НЕ signed in — нічого не робимо, це територія AuthModal
+		});
+	})();
+</script>
+
+<style>
+	.account-modal:not([hidden]) {
+		position: fixed;
+		inset: 0;
+		z-index: 250;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 24px 16px;
+	}
+
+	.account-modal__scrim {
+		position: absolute;
+		inset: 0;
+		background: rgba(11, 13, 16, 0.72);
+		backdrop-filter: blur(3px);
+	}
+
+	.account-modal__overlay {
+		position: relative;
+		width: 100%;
+		max-width: 900px;
+		max-height: 92vh;
+		overflow-y: auto;
+		display: grid;
+		grid-template-columns: 1fr 1.25fr;
+		background: #fff;
+		border-radius: 20px;
+		box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.55);
+		animation: account-modal-pop 0.18s ease;
+	}
+
+	@keyframes account-modal-pop {
+		from {
+			opacity: 0;
+			transform: translateY(12px) scale(0.98);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+		}
+	}
+
+	.account-modal__close {
+		position: absolute;
+		top: 14px;
+		right: 14px;
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		border: none;
+		background: rgba(255, 255, 255, 0.15);
+		color: #fff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		z-index: 5;
+	}
+
+	.account-modal__close svg {
+		width: 15px;
+		height: 15px;
+	}
+
+	.account-modal__close:hover {
+		background: rgba(255, 255, 255, 0.28);
+	}
+
+	/* Ліва панель — профіль + бали */
+	.account-modal__brand {
+		position: relative;
+		background: linear-gradient(165deg, var(--bg-dark) 0%, #060708 100%);
+		color: var(--cream);
+		padding: 2.5rem 2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1.4rem;
+		overflow: hidden;
+	}
+
+	.account-modal__brand::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background-image: radial-gradient(circle, rgba(245, 245, 243, 0.08) 1px, transparent 1px);
+		background-size: 20px 20px;
+		opacity: 0.6;
+		pointer-events: none;
+	}
+
+	.am-who {
+		position: relative;
+		display: flex;
+		align-items: center;
+		gap: 0.8rem;
+	}
+
+	.am-avatar {
+		width: 2.9rem;
+		height: 2.9rem;
+		border-radius: 50%;
+		background: var(--accent);
+		color: var(--accent-ink);
+		font-family: var(--font-display);
+		font-weight: 600;
+		font-size: 1.05rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.am-name {
+		margin: 0 0 0.15rem;
+		font-family: var(--font-display);
+		font-weight: 600;
+		font-size: 1.05rem;
+		color: var(--cream);
+	}
+
+	.am-since {
+		margin: 0;
+		font-size: 0.72rem;
+		color: var(--cream-muted);
+	}
+
+	.am-loyalty {
+		position: relative;
+		background: rgba(245, 245, 243, 0.06);
+		border: 1px solid rgba(245, 245, 243, 0.14);
+		border-radius: 0.9rem;
+		padding: 1rem 1.1rem;
+	}
+
+	.am-loyalty__label {
+		margin: 0 0 0.3rem;
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.07em;
+		color: var(--cream-muted);
+	}
+
+	.am-loyalty__points {
+		font-family: var(--font-display);
+		margin: 0 0 0.55rem;
+		font-size: 1.8rem;
+		font-weight: 600;
+		display: flex;
+		align-items: baseline;
+		gap: 0.5rem;
+		color: var(--cream);
+	}
+
+	.am-loyalty__euro {
+		font-family: 'Inter Variable', sans-serif;
+		font-size: 0.76rem;
+		font-weight: 500;
+		color: var(--accent);
+	}
+
+	.am-loyalty__note {
+		margin: 0;
+		font-size: 0.74rem;
+		line-height: 1.55;
+		color: var(--cream-muted);
+	}
+
+	.am-logout-form {
+		position: relative;
+		margin-top: auto;
+	}
+
+	.am-logout {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.55rem;
+		height: 2.6rem;
+		border-radius: 0.6rem;
+		border: 1px solid rgba(245, 245, 243, 0.2);
+		background: transparent;
+		color: var(--cream-muted);
+		font-size: 0.82rem;
+		font-weight: 600;
+		cursor: pointer;
+		font-family: inherit;
+	}
+
+	.am-logout svg {
+		width: 15px;
+		height: 15px;
+	}
+
+	.am-logout:hover {
+		border-color: rgba(245, 245, 243, 0.4);
+		color: var(--cream);
+	}
+
+	/* Права панель — дані */
+	.account-modal__panel {
+		padding: 2.25rem 2rem 2rem;
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+
+	.eyebrow-form {
+		font-size: 0.7rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--accent);
+		font-weight: 700;
+		margin: 0 0 0.4rem;
+	}
+
+	.account-modal__panel h1 {
+		font-family: var(--font-display);
+		font-size: 1.5rem;
+		font-weight: 600;
+		margin: 0 0 1.2rem;
+		color: var(--text-dark);
+	}
+
+	.am-stats {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 0.7rem;
+		margin-bottom: 1.4rem;
+	}
+
+	.am-stat {
+		background: var(--bg-light);
+		border: 1px solid var(--border-light);
+		border-radius: 0.7rem;
+		padding: 0.8rem 0.75rem;
+		display: flex;
+		align-items: flex-start;
+		gap: 0.6rem;
+		min-width: 0;
+	}
+
+	.am-stat__icon {
+		width: 2rem;
+		height: 2rem;
+		border-radius: 0.5rem;
+		background: rgba(0, 114, 206, 0.09);
+		color: var(--accent);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.am-stat__icon svg {
+		width: 15px;
+		height: 15px;
+	}
+
+	.am-stat__value {
+		margin: 0;
+		font-weight: 700;
+		font-size: 0.82rem;
+		overflow-wrap: anywhere;
+	}
+
+	.am-stat__value--small {
+		font-size: 0.72rem;
+		font-weight: 600;
+	}
+
+	.am-stat__label {
+		margin: 0;
+		font-size: 0.68rem;
+		color: var(--text-dark-muted);
+	}
+
+	.am-section {
+		border-top: 1px solid var(--border-light);
+		padding-top: 1.1rem;
+		margin-bottom: 1.1rem;
+	}
+
+	.am-section h2 {
+		font-family: var(--font-display);
+		font-weight: 600;
+		font-size: 0.95rem;
+		margin: 0 0 0.8rem;
+		color: var(--text-dark);
+	}
+
+	.am-detail-grid {
+		margin: 0;
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 0.75rem 1.2rem;
+	}
+
+	.am-detail-grid dt {
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--text-dark-muted);
+	}
+
+	.am-detail-grid dd {
+		margin: 0.1rem 0 0;
+		font-weight: 600;
+		font-size: 0.82rem;
+		overflow-wrap: anywhere;
+	}
+
+	.am-empty {
+		margin: 0;
+		font-size: 0.82rem;
+		color: var(--text-dark-muted);
+	}
+
+	.am-full-link {
+		margin-top: auto;
+		align-self: flex-start;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		color: var(--accent);
+		text-decoration: none;
+		font-weight: 700;
+		font-size: 0.82rem;
+	}
+
+	.am-full-link svg {
+		width: 14px;
+		height: 14px;
+	}
+
+	.am-full-link:hover {
+		text-decoration: underline;
+	}
+
+	@media (max-width: 700px) {
+		.account-modal__overlay {
+			grid-template-columns: 1fr;
+		}
+
+		.account-modal__brand {
+			padding: 2rem 1.5rem;
+		}
+
+		.account-modal__panel {
+			padding: 2rem 1.5rem;
+		}
+
+		.am-stats {
+			grid-template-columns: 1fr;
+		}
+
+		.am-detail-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

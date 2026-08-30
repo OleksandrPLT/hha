@@ -1,0 +1,58 @@
+<svg viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .mark { fill: #f5f5f3; }
+      .accent { fill: #0072CE; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="#0b0d10"/>
+
+  <!-- crescent arch, in the Estonian accent blue -->
+  <path class="accent" d="M 380,300
+           C 480,120 640,20 800,20
+           C 960,20 1120,120 1220,300
+           C 1220,300 1200,300 1180,290
+           C 1090,150 950,70 800,70
+           C 650,70 510,150 420,290
+           C 400,300 380,300 380,300 Z"/>
+
+  <!-- floor lamp -->
+  <g>
+    <path class="mark" d="M 155,205 L 215,205 L 255,335 L 115,335 Z"/>
+    <rect class="mark" x="172" y="335" width="16" height="430" rx="6"/>
+    <line x1="180" y1="345" x2="180" y2="405" stroke="#f5f5f3" stroke-width="6" stroke-linecap="round"/>
+    <circle class="accent" cx="180" cy="417" r="9"/>
+  </g>
+
+  <!-- pillows -->
+  <rect class="mark" x="585" y="430" width="210" height="170" rx="42"/>
+  <rect class="mark" x="805" y="430" width="210" height="170" rx="42"/>
+
+  <!-- bed base -->
+  <path class="mark" d="M 350,655
+           C 350,598 398,565 485,565
+           L 1115,565
+           C 1202,565 1250,598 1250,655
+           C 1250,715 1185,748 1070,748
+           L 530,748
+           C 415,748 350,715 350,655 Z"/>
+
+  <!-- scroll legs -->
+  <path class="mark" d="M 430,690
+           C 415,725 370,735 340,780
+           C 322,808 330,835 358,830
+           C 392,824 408,780 442,730
+           C 452,712 452,698 430,690 Z"/>
+  <path class="mark" d="M 1170,690
+           C 1185,725 1230,735 1260,780
+           C 1278,808 1270,835 1242,830
+           C 1208,824 1192,780 1158,730
+           C 1148,712 1148,698 1170,690 Z"/>
+
+  <!-- coastline wave under the bed, nodding to Maardu's shoreline -->
+  <path fill="none" stroke="#0072CE" stroke-width="10" stroke-linecap="round"
+        d="M 330,845 C 400,815 450,875 520,845 C 590,815 640,875 710,845
+           C 780,815 830,875 890,845 C 960,815 1010,875 1080,845
+           C 1150,815 1200,875 1270,845"/>
+</svg>
