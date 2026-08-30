@@ -175,7 +175,7 @@ const d = copy.dashboard;
 			</div>
 
 			<div class="am-links-row">
-				<a href={`/${locale}/account`} class="am-full-link">
+				<a href={`/${locale}/account`} class="am-full-link" data-full-link>
 					{d.viewFullProfile}
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
 				</a>
@@ -238,6 +238,8 @@ const d = copy.dashboard;
 					setText('accountType', data.isCompany ? modal.dataset.companyLabel : modal.dataset.individualLabel);
 					setText('memberId', data.memberId);
 					setHtml('qrSvg', data.qrSvg);
+					var fullLink = modal.querySelector('[data-full-link]');
+					if (fullLink && data.memberId) fullLink.href = '/' + locale + '/account/' + data.memberId;
 					setText('email', data.email);
 					setText('phone', data.phone);
 					setRow('nationality', data.nationality);

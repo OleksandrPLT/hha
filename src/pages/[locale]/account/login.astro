@@ -7,6 +7,7 @@ import { account } from '../../../i18n/account';
 import { db } from '../../../db/client';
 import { guests } from '../../../db/schema';
 import { verifyPassword } from '../../../lib/auth';
+import { formatMemberId } from '../../../lib/memberCard';
 import { eq } from 'drizzle-orm';
 
 const rawLocale = Astro.params.locale;
@@ -36,7 +37,7 @@ if (Astro.request.method === 'POST') {
 		// щоб шапка/модалка знали, показувати "Sign in" чи "My account", не
 		// звертаючись до сервера.
 		Astro.cookies.set('hha_signed_in', '1', { path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 30 });
-		return Astro.redirect(`/${locale}/account`);
+		return Astro.redirect(`/${locale}/account/${formatMemberId(guest.id)}`);
 	}
 }
 ---
