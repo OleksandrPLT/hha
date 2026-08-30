@@ -23,6 +23,7 @@ export interface AdminCopy {
 		invoices: string;
 		organizations: string;
 		marketing: string;
+		migrationReport: string;
 		logout: string;
 		brand: string;
 		brandSub: string;
@@ -395,6 +396,13 @@ export interface AdminCopy {
 		errorRequired: string;
 		errorNoRecipients: string;
 	};
+	migrationReport: {
+		title: string;
+		subtitle: string;
+		from: string;
+		to: string;
+		downloadBtn: string;
+	};
 }
 
 export const admin: Record<AdminLocale, AdminCopy> = {
@@ -409,6 +417,7 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			invoices: 'Інвойси',
 			organizations: 'Організації',
 			marketing: 'Розсилки',
+			migrationReport: 'Звіт для PPA',
 			logout: 'Вийти',
 			brand: 'Hostel 3A',
 			brandSub: 'Адмін-панель',
@@ -788,6 +797,13 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			errorRequired: "Заповніть тему і текст листа.",
 			errorNoRecipients: 'Немає жодного гостя зі згодою на маркетингові розсилки.',
 		},
+		migrationReport: {
+			title: 'Звіт для PPA',
+			subtitle: 'Список гостей за період — PDF естонською, на бланку хостела, для міграційної служби (Politsei- ja Piirivalveamet).',
+			from: 'Період з',
+			to: 'Період по',
+			downloadBtn: 'Завантажити PDF',
+		},
 	},
 	ru: {
 		nav: {
@@ -800,6 +816,7 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			invoices: 'Инвойсы',
 			organizations: 'Организации',
 			marketing: 'Рассылки',
+			migrationReport: 'Отчёт для PPA',
 			logout: 'Выйти',
 			brand: 'Hostel 3A',
 			brandSub: 'Админ-панель',
@@ -1178,6 +1195,13 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			empty: 'Ещё не было ни одной рассылки.',
 			errorRequired: 'Заполните тему и текст письма.',
 			errorNoRecipients: 'Нет ни одного гостя с согласием на маркетинговые рассылки.',
+		},
+		migrationReport: {
+			title: 'Отчёт для PPA',
+			subtitle: 'Список гостей за период — PDF на эстонском, на бланке хостела, для миграционной службы (Politsei- ja Piirivalveamet).',
+			from: 'Период с',
+			to: 'Период по',
+			downloadBtn: 'Скачать PDF',
 		},
 	},
 };

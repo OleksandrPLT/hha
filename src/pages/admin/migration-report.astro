@@ -1,0 +1,99 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { db } from '../../db/client';
+import { admins } from '../../db/schema';
+import { eq } from 'drizzle-orm';
+import { getAdminLocale, admin as adminCopy } from '../../i18n/admin';
+
+export const prerender = false;
+
+const adminId = await Astro.session?.get('adminId');
+if (!adminId) {
+	return Astro.redirect('/admin/login');
+}
+const currentAdmin = db.select().from(admins).where(eq(admins.id, adminId)).get();
+if (!currentAdmin) {
+	return Astro.redirect('/admin/login');
+}
+
+const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = adminCopy[locale].migrationReport;
+
+const today = new Date().toISOString().slice(0, 10);
+const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+---
+
+<AdminLayout title={copy.title} adminName={currentAdmin.fullName} activeNav="migrationReport">
+	<h1>{copy.title}</h1>
+	<p class="page-subtitle">{copy.subtitle}</p>
+
+	<form method="GET" action="/api/admin/migration-report" class="report-form" target="_blank">
+		<label>
+			{copy.from}
+			<input type="date" name="from" required value={monthAgo} />
+		</label>
+		<label>
+			{copy.to}
+			<input type="date" name="to" required value={today} />
+		</label>
+		<button type="submit" class="btn-primary">{copy.downloadBtn}</button>
+	</form>
+
+	<style>
+		h1 {
+			margin: 0;
+			font-size: 1.4rem;
+			font-weight: 700;
+		}
+
+		.page-subtitle {
+			margin: 0 0 1.5rem;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+			max-width: 40rem;
+		}
+
+		.report-form {
+			display: flex;
+			align-items: flex-end;
+			gap: 1rem;
+			flex-wrap: wrap;
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			padding: 1.5rem;
+			max-width: 34rem;
+		}
+
+		.report-form label {
+			display: flex;
+			flex-direction: column;
+			gap: 0.35rem;
+			font-size: 0.85rem;
+			font-weight: 600;
+			color: var(--text-dark);
+		}
+
+		.report-form input {
+			font: inherit;
+			font-weight: 400;
+			padding: 0.55rem 0.7rem;
+			border-radius: 0.5rem;
+			border: 1px solid var(--border-light);
+			background: #fff;
+			color: var(--text-dark);
+		}
+
+		.btn-primary {
+			font: inherit;
+			font-size: 0.85rem;
+			font-weight: 700;
+			padding: 0.62rem 1.2rem;
+			border-radius: 0.5rem;
+			border: none;
+			background: var(--bg-dark);
+			color: var(--cream);
+			cursor: pointer;
+		}
+	</style>
+</AdminLayout>
