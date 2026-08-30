@@ -71,6 +71,9 @@ const revolutReady = isRevolutConfigured() && Boolean(bk.paymentRef) && Boolean(
 					<div><dt>{bookingCopy[locale].page.roomLabel}</dt><dd>{roomTitle}</dd></div>
 					<div><dt>{bookingCopy[locale].page.checkIn}</dt><dd>{bk.checkIn}</dd></div>
 					<div><dt>{bookingCopy[locale].page.checkOut}</dt><dd>{bk.checkOut}</dd></div>
+					{bk.discountCents > 0 && (
+						<div><dt>{bookingCopy[locale].page.discountLabel}</dt><dd>−{currency}{(bk.discountCents / 100).toFixed(2)}</dd></div>
+					)}
 					<div><dt>{bookingCopy[locale].page.summaryTotal}</dt><dd>{currency}{(bk.totalCents / 100).toFixed(2)}</dd></div>
 				</dl>
 

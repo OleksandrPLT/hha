@@ -34,7 +34,11 @@ export interface BookingCopy {
 		paymentRevolutHint: string;
 		summaryHeading: string;
 		summaryNights: string;
+		summarySubtotal: string;
 		summaryTotal: string;
+		discountLabel: string;
+		calendarPrevMonth: string;
+		calendarNextMonth: string;
 		submitBtn: string;
 		submitting: string;
 		errorGeneric: string;
@@ -91,7 +95,11 @@ export const booking: Record<Locale, BookingCopy> = {
 			paymentRevolutHint: 'Secure online payment',
 			summaryHeading: 'Summary',
 			summaryNights: 'nights',
+			summarySubtotal: 'Subtotal',
 			summaryTotal: 'Total',
+			discountLabel: 'Discount',
+			calendarPrevMonth: 'Previous month',
+			calendarNextMonth: 'Next month',
 			submitBtn: 'Confirm booking',
 			submitting: 'Booking…',
 			errorGeneric: 'Please fill in all required fields correctly.',
@@ -146,7 +154,11 @@ export const booking: Record<Locale, BookingCopy> = {
 			paymentRevolutHint: 'Turvaline veebimakse',
 			summaryHeading: 'Kokkuvõte',
 			summaryNights: 'ööd',
+			summarySubtotal: 'Vahesumma',
 			summaryTotal: 'Kokku',
+			discountLabel: 'Allahindlus',
+			calendarPrevMonth: 'Eelmine kuu',
+			calendarNextMonth: 'Järgmine kuu',
 			submitBtn: 'Kinnita broneering',
 			submitting: 'Broneerin…',
 			errorGeneric: 'Palun täida kõik kohustuslikud väljad korrektselt.',
@@ -201,7 +213,11 @@ export const booking: Record<Locale, BookingCopy> = {
 			paymentRevolutHint: 'Безпечна онлайн-оплата',
 			summaryHeading: 'Підсумок',
 			summaryNights: 'ночей',
+			summarySubtotal: 'Проміжна сума',
 			summaryTotal: 'Разом',
+			discountLabel: 'Знижка',
+			calendarPrevMonth: 'Попередній місяць',
+			calendarNextMonth: 'Наступний місяць',
 			submitBtn: 'Підтвердити бронювання',
 			submitting: 'Бронюємо…',
 			errorGeneric: 'Заповніть коректно всі обов\'язкові поля.',
@@ -256,7 +272,11 @@ export const booking: Record<Locale, BookingCopy> = {
 			paymentRevolutHint: 'Безопасная онлайн-оплата',
 			summaryHeading: 'Итог',
 			summaryNights: 'ночей',
+			summarySubtotal: 'Промежуточная сумма',
 			summaryTotal: 'Всего',
+			discountLabel: 'Скидка',
+			calendarPrevMonth: 'Предыдущий месяц',
+			calendarNextMonth: 'Следующий месяц',
 			submitBtn: 'Подтвердить бронирование',
 			submitting: 'Бронируем…',
 			errorGeneric: 'Заполните корректно все обязательные поля.',
@@ -311,7 +331,11 @@ export const booking: Record<Locale, BookingCopy> = {
 			paymentRevolutHint: 'Drošs tiešsaistes maksājums',
 			summaryHeading: 'Kopsavilkums',
 			summaryNights: 'naktis',
+			summarySubtotal: 'Starpsumma',
 			summaryTotal: 'Kopā',
+			discountLabel: 'Atlaide',
+			calendarPrevMonth: 'Iepriekšējais mēnesis',
+			calendarNextMonth: 'Nākamais mēnesis',
 			submitBtn: 'Apstiprināt rezervāciju',
 			submitting: 'Rezervē…',
 			errorGeneric: 'Lūdzu, pareizi aizpildi visus obligātos laukus.',
@@ -366,7 +390,11 @@ export const booking: Record<Locale, BookingCopy> = {
 			paymentRevolutHint: 'Turvallinen verkkomaksu',
 			summaryHeading: 'Yhteenveto',
 			summaryNights: 'yötä',
+			summarySubtotal: 'Välisumma',
 			summaryTotal: 'Yhteensä',
+			discountLabel: 'Alennus',
+			calendarPrevMonth: 'Edellinen kuukausi',
+			calendarNextMonth: 'Seuraava kuukausi',
 			submitBtn: 'Vahvista varaus',
 			submitting: 'Varataan…',
 			errorGeneric: 'Täytä kaikki pakolliset kentät oikein.',

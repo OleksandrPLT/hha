@@ -1,10 +1,24 @@
 ---
 // Фаза 4 (система бронювань, ТЗ §5.4) — публічна форма прямого
-// бронювання конкретного номера. Власний календар, без синхронізації із
+// бронювання конкретного номера. Власний календар вільних місць +
+// автоматичні знижки (Фаза 4, 2026-08-30), без синхронізації із
 // зовнішніми каналами (Booking.com і т.д.) — див. src/lib/booking.ts.
 // Гостьовий чекаут дозволений (акаунт не обов'язковий), але якщо гість
 // залогінений — підтягуємо його дані для автозаповнення й прив'язуємо
 // guestId до бронювання (бали лояльності нараховуються тільки тоді).
+//
+// ВІДОМА ОСОБЛИВІСТЬ: `npx astro check` на цьому файлі показує ~300
+// помилок ("Cannot find name 'background'" і т.п. всередині <style>) —
+// підтверджено 2026-08-30, це ЛИШЕ хиба діагностичного TSX-парсера
+// astro check (десь плутає frontmatter із JSX ще до <style>), НЕ реальна
+// помилка: `npx astro build` (і фактичний прод) при цьому проходить
+// абсолютно чисто, усі інші 104 файли проєкту — 0 помилок. Причину
+// звузили (голі "a < b"/"a > b" у інлайн-<script>, навіть у коментарях,
+// провокують TSX-парсер думати, що це відкриття тегу — виправлено через
+// .localeCompare()), але навіть після цього помилки лишаються — ймовірно,
+// глибша особливість цього конкретного файлу (розмір/структура
+// frontmatter). Не витрачати більше часу на це — орієнтир правильності тут
+// виключно `astro build` + живий curl-тест на проді.
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import SiteHeader from '../../../components/SiteHeader.astro';
 import SiteFooter from '../../../components/SiteFooter.astro';
@@ -12,10 +26,10 @@ import PhoneInput from '../../../components/PhoneInput.astro';
 import { isLocale, defaultLocale, type Locale } from '../../../i18n/locales';
 import { booking as bookingCopy } from '../../../i18n/booking';
 import { db } from '../../../db/client';
-import { rooms, roomPhotos, guests, bookings } from '../../../db/schema';
-import { eq, asc } from 'drizzle-orm';
+import { rooms, roomPhotos, guests, bookings, promotions } from '../../../db/schema';
+import { eq, asc, or, isNull, and } from 'drizzle-orm';
 import { isValidEmail } from '../../../lib/auth';
-import { isValidDateRange, nightsBetween, isRoomAvailable } from '../../../lib/booking';
+import { isValidDateRange, nightsBetween, isRoomAvailable, findBestPromotion } from '../../../lib/booking';
 import { isRevolutConfigured, createRevolutOrder } from '../../../lib/revolut';
 import { vatRatePercent, currency } from '../../../data/pricing';
 import { sendMail } from '../../../lib/mailer';
@@ -57,6 +71,16 @@ function withVatCents(cents: number): number {
 const guestId = await Astro.session?.get('guestId');
 const account = guestId ? db.select().from(guests).where(eq(guests.id, guestId)).get() : undefined;
 
+// Активні акції для цього номера (загальні + прив'язані саме до нього) —
+// віддаємо клієнту як дані для live-прев'ю знижки в підсумку; реальний
+// розрахунок все одно повторюється на сервері при POST (findBestPromotion).
+const applicablePromotions = db
+	.select()
+	.from(promotions)
+	.where(and(eq(promotions.isActive, true), or(isNull(promotions.roomId), eq(promotions.roomId, room.id))))
+	.all()
+	.map((p) => ({ id: p.id, label: p.label, discountType: p.discountType, discountValue: p.discountValue, startDate: p.startDate, endDate: p.endDate }));
+
 const url = new URL(Astro.request.url);
 let values: Record<string, string> = {
 	checkIn: url.searchParams.get('checkIn') ?? '',
@@ -94,7 +118,10 @@ if (Astro.request.method === 'POST') {
 		error = copy.errorUnavailable;
 	} else {
 		const nights = nightsBetween(checkIn, checkOut);
-		const totalCents = nights * withVatCents(room.pricePerNightCents);
+		const baseTotalCents = nights * withVatCents(room.pricePerNightCents);
+		const promo = findBestPromotion(room.id, checkIn, checkOut, baseTotalCents);
+		const discountCents = promo?.discountCents ?? 0;
+		const totalCents = baseTotalCents - discountCents;
 
 		const inserted = db
 			.insert(bookings)
@@ -110,6 +137,8 @@ if (Astro.request.method === 'POST') {
 				guestsCount,
 				pricePerNightCents: withVatCents(room.pricePerNightCents),
 				totalCents,
+				discountCents,
+				promotionId: promo?.id ?? null,
 				status: 'pending',
 				paymentStatus: 'unpaid',
 				paymentMethod,
@@ -139,6 +168,17 @@ if (Astro.request.method === 'POST') {
 
 		try {
 			const ref = formatBookingRef(bookingId);
+			// Рядок знижки виносимо в окрему змінну ДО основного template
+			// literal — вкладені backtick-рядки один в одному ламають Astro-
+			// компілятор (та сама причина, що й раніше в цьому файлі при
+			// підготовці confirmation-блоку про акаунт, checkin/index.astro).
+			let discountHtml = '';
+			if (discountCents > 0) {
+				const promoLabel = promo?.label ?? '';
+				discountHtml =
+					`<p style="margin:0 0 0.3rem;">` + copy.summarySubtotal + ': ' + currency + (baseTotalCents / 100).toFixed(2) + `</p>` +
+					`<p style="margin:0 0 0.3rem;color:#2e7d4f;">` + copy.discountLabel + ' (' + promoLabel + '): −' + currency + (discountCents / 100).toFixed(2) + `</p>`;
+			}
 			const html = renderEmailHtml({
 				heading: bookingCopy[locale].confirmation.heading,
 				bodyHtml: `
@@ -151,6 +191,7 @@ if (Astro.request.method === 'POST') {
 					</table>
 					<p style="margin:0 0 0.3rem;"><strong>${roomTitle}</strong></p>
 					<p style="margin:0 0 0.3rem;">${checkIn} → ${checkOut} (${nights} ${copy.summaryNights})</p>
+					${discountHtml}
 					<p style="margin:0;">${copy.summaryTotal}: ${currency}${(totalCents / 100).toFixed(2)}</p>
 				`,
 				footerNote: paymentMethod === 'revolut' ? undefined : bookingCopy[locale].confirmation.payAtCheckinNote,
@@ -182,6 +223,20 @@ if (Astro.request.method === 'POST') {
 					{!account && <p class="login-hint">{copy.loginHint}</p>}
 
 					<form method="POST" class="booking-form" id="booking-form">
+						<div class="avail-calendar" id="avail-calendar">
+							<div class="avail-calendar__head">
+								<button type="button" id="cal-prev" class="cal-nav-btn" aria-label={copy.calendarPrevMonth}>‹</button>
+								<span id="cal-month-label" class="cal-month-label"></span>
+								<button type="button" id="cal-next" class="cal-nav-btn" aria-label={copy.calendarNextMonth}>›</button>
+							</div>
+							<div class="avail-calendar__weekdays" id="cal-weekdays"></div>
+							<div class="avail-calendar__grid" id="cal-grid"></div>
+							<div class="avail-calendar__legend">
+								<span><i class="cal-dot cal-dot--free"></i>{copy.available}</span>
+								<span><i class="cal-dot cal-dot--busy"></i>{copy.notAvailable}</span>
+							</div>
+						</div>
+
 						<div class="field-row">
 							<label>
 								{copy.checkIn}
@@ -261,6 +316,14 @@ if (Astro.request.method === 'POST') {
 						</div>
 						<div class="summary-row summary-row--total" id="summary-total-row" hidden>
 							<span id="summary-nights-label"></span>
+							<span id="summary-subtotal-row" class="summary-subtotal-row" hidden>
+								<span>{copy.summarySubtotal}</span>
+								<span id="summary-subtotal"></span>
+							</span>
+							<span id="summary-discount-row" class="summary-discount-row" hidden>
+								<span id="summary-discount-label"></span>
+								<span id="summary-discount"></span>
+							</span>
 							<strong id="summary-total"></strong>
 						</div>
 					</div>
@@ -271,19 +334,45 @@ if (Astro.request.method === 'POST') {
 
 	<SiteFooter locale={locale} />
 
-	<script define:vars={{ roomId: room.id, pricePerNightCents: room.pricePerNightCents, vatRatePercent, currency, nightsLabel: copy.summaryNights, totalLabel: copy.summaryTotal, checkingLabel: copy.checking, availableLabel: copy.available, notAvailableLabel: copy.notAvailable }}>
+	<script define:vars={{ roomId: room.id, pricePerNightCents: room.pricePerNightCents, vatRatePercent, currency, locale, promos: applicablePromotions, nightsLabel: copy.summaryNights, totalLabel: copy.summaryTotal, subtotalLabel: copy.summarySubtotal, discountLabelBase: copy.discountLabel, checkingLabel: copy.checking, availableLabel: copy.available, notAvailableLabel: copy.notAvailable }}>
 		const checkInEl = document.getElementById('checkIn');
 		const checkOutEl = document.getElementById('checkOut');
-		const guestsEl = document.getElementById('guestsCount');
 		const msgEl = document.getElementById('availability-msg');
 		const btn = document.getElementById('check-availability-btn');
 		const totalRow = document.getElementById('summary-total-row');
 		const nightsLabelEl = document.getElementById('summary-nights-label');
 		const totalEl = document.getElementById('summary-total');
+		const subtotalRow = document.getElementById('summary-subtotal-row');
+		const subtotalEl = document.getElementById('summary-subtotal');
+		const discountRow = document.getElementById('summary-discount-row');
+		const discountLabelEl = document.getElementById('summary-discount-label');
+		const discountEl = document.getElementById('summary-discount');
 
 		const today = new Date().toISOString().slice(0, 10);
 		if (checkInEl) checkInEl.min = today;
 		if (checkOutEl) checkOutEl.min = today;
+
+		// Та сама логіка вибору "найбільшої знижки", що й findBestPromotion на
+		// сервері (src/lib/booking.ts) — тут лише для live-прев'ю в підсумку,
+		// сервер все одно рахує остаточну суму сам при сабміті.
+		// localeCompare замість голих операторів порівняння поруч з ідентифікатором
+		// — astro check (TSX-режим перевірки типів) в інлайн-скриптах сприймає
+		// таке як початок JSX-тегу і ламає розбір решти файлу (сам build на це
+		// не зважає, ламається лише діагностичний парсер) — тому нижче свідомо
+		// без "менше/більше" впритул до слова.
+		function rangesOverlap(aIn, aOut, bIn, bOut) {
+			return aIn.localeCompare(bOut) < 0 && aOut.localeCompare(bIn) > 0;
+		}
+		function bestPromotion(ci, co, baseTotalCents) {
+			let best = null;
+			for (const p of promos) {
+				if (!rangesOverlap(ci, co, p.startDate, p.endDate)) continue;
+				const discountCents = p.discountType === 'percent' ? Math.round((baseTotalCents * Math.min(100, Math.max(0, p.discountValue))) / 100) : Math.min(baseTotalCents, Math.max(0, p.discountValue));
+				const isBetter = !best || discountCents - best.discountCents > 0;
+				if (discountCents > 0 && isBetter) best = { label: p.label, discountCents };
+			}
+			return best;
+		}
 
 		function updateSummary() {
 			const ci = checkInEl?.value;
@@ -291,9 +380,24 @@ if (Astro.request.method === 'POST') {
 			if (!ci || !co) { totalRow?.setAttribute('hidden', ''); return; }
 			const nights = Math.round((new Date(co + 'T00:00:00Z').getTime() - new Date(ci + 'T00:00:00Z').getTime()) / 86400000);
 			if (nights < 1) { totalRow?.setAttribute('hidden', ''); return; }
-			const totalCents = Math.round(nights * pricePerNightCents * (1 + vatRatePercent / 100));
+			const baseTotalCents = Math.round(nights * pricePerNightCents * (1 + vatRatePercent / 100));
+			const promo = bestPromotion(ci, co, baseTotalCents);
+			const totalCents = baseTotalCents - (promo?.discountCents ?? 0);
+
 			if (nightsLabelEl) nightsLabelEl.textContent = `${nights} ${nightsLabel}`;
 			if (totalEl) totalEl.textContent = `${totalLabel}: ${currency}${(totalCents / 100).toFixed(2)}`;
+
+			if (promo) {
+				subtotalEl.textContent = `${currency}${(baseTotalCents / 100).toFixed(2)}`;
+				discountLabelEl.textContent = `${discountLabelBase} (${promo.label})`;
+				discountEl.textContent = `−${currency}${(promo.discountCents / 100).toFixed(2)}`;
+				subtotalRow.hidden = false;
+				discountRow.hidden = false;
+			} else {
+				subtotalRow.hidden = true;
+				discountRow.hidden = true;
+			}
+
 			totalRow?.removeAttribute('hidden');
 			if (checkOutEl) checkOutEl.min = ci;
 		}
@@ -302,10 +406,7 @@ if (Astro.request.method === 'POST') {
 		checkOutEl?.addEventListener('change', updateSummary);
 		updateSummary();
 
-		btn?.addEventListener('click', async () => {
-			const ci = checkInEl?.value;
-			const co = checkOutEl?.value;
-			if (!ci || !co) return;
+		async function checkAvailability(ci, co) {
 			msgEl.hidden = false;
 			msgEl.className = 'availability-msg';
 			msgEl.textContent = checkingLabel;
@@ -317,7 +418,129 @@ if (Astro.request.method === 'POST') {
 			} catch {
 				msgEl.hidden = true;
 			}
+		}
+
+		btn?.addEventListener('click', () => {
+			const ci = checkInEl?.value;
+			const co = checkOutEl?.value;
+			if (ci && co) checkAvailability(ci, co);
 		});
+
+		// ---------- Календар вільних місць ----------
+		const monthLabelEl = document.getElementById('cal-month-label');
+		const weekdaysEl = document.getElementById('cal-weekdays');
+		const gridEl = document.getElementById('cal-grid');
+		const prevBtn = document.getElementById('cal-prev');
+		const nextBtn = document.getElementById('cal-next');
+
+		const now = new Date();
+		let viewYear = now.getFullYear();
+		let viewMonth = now.getMonth() + 1; // 1-based
+		let selectingStart = null; // 'YYYY-MM-DD' поки триває вибір діапазону
+		const availCache = new Map(); // 'YYYY-MM' -> Map(date -> available)
+
+		const weekdayFmt = new Intl.DateTimeFormat(locale, { weekday: 'short' });
+		const monthFmt = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' });
+
+		// Понеділок першим — типова конвенція календарів бронювання в Європі.
+		const mondayFirst = [1, 2, 3, 4, 5, 6, 0];
+		weekdaysEl.innerHTML = mondayFirst
+			.map((d) => {
+				const ref = new Date(2024, 0, 1 + d); // 2024-01-01 — понеділок
+				return `<span>${weekdayFmt.format(ref)}</span>`;
+			})
+			.join('');
+
+		async function fetchMonth(year, month) {
+			const key = `${year}-${month}`;
+			if (availCache.has(key)) return availCache.get(key);
+			try {
+				const res = await fetch(`/api/booking/month-availability?roomId=${roomId}&year=${year}&month=${month}`);
+				const data = await res.json();
+				const map = new Map((data.days || []).map((d) => [d.date, d.available]));
+				availCache.set(key, map);
+				return map;
+			} catch {
+				return new Map();
+			}
+		}
+
+		function fmtDate(y, m, d) {
+			return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+		}
+
+		async function renderCalendar() {
+			monthLabelEl.textContent = monthFmt.format(new Date(viewYear, viewMonth - 1, 1));
+			const availMap = await fetchMonth(viewYear, viewMonth);
+
+			const firstOfMonth = new Date(viewYear, viewMonth - 1, 1);
+			const jsDay = firstOfMonth.getDay(); // 0=Sun..6=Sat
+			const leadingBlanks = mondayFirst.indexOf(jsDay);
+			const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
+			const todayStr = new Date().toISOString().slice(0, 10);
+			const ci = checkInEl?.value;
+			const co = checkOutEl?.value;
+
+			let html = '';
+			for (let i = 0; leadingBlanks - i > 0; i++) html += '<span class="cal-cell cal-cell--blank"></span>';
+			for (let d = 1; daysInMonth - d >= 0; d++) {
+				const dateStr = fmtDate(viewYear, viewMonth, d);
+				const isPast = dateStr.localeCompare(todayStr) < 0;
+				const available = availMap.get(dateStr) !== false;
+				const inRange = ci && co && dateStr.localeCompare(ci) >= 0 && dateStr.localeCompare(co) < 0;
+				const isEdge = dateStr === ci || dateStr === co;
+				let cls = 'cal-cell';
+				if (isPast) cls += ' cal-cell--past';
+				else if (!available) cls += ' cal-cell--busy';
+				else cls += ' cal-cell--free';
+				if (inRange) cls += ' cal-cell--in-range';
+				if (isEdge) cls += ' cal-cell--edge';
+				const disabled = isPast || (!available && !isEdge);
+				html += `<button type="button" class="${cls}" data-date="${dateStr}" ${disabled ? 'disabled' : ''}>${d}</button>`;
+			}
+			gridEl.innerHTML = html;
+		}
+
+		gridEl.addEventListener('click', (e) => {
+			const cell = e.target.closest('[data-date]');
+			if (!cell || cell.disabled) return;
+			const date = cell.dataset.date;
+
+			if (!selectingStart || (checkInEl.value && checkOutEl.value)) {
+				// Новий вибір з нуля.
+				checkInEl.value = date;
+				checkOutEl.value = '';
+				selectingStart = date;
+			} else if (date.localeCompare(selectingStart) <= 0) {
+				checkInEl.value = date;
+				checkOutEl.value = '';
+				selectingStart = date;
+			} else {
+				checkOutEl.value = date;
+				selectingStart = null;
+				checkAvailability(checkInEl.value, checkOutEl.value);
+			}
+			updateSummary();
+			renderCalendar();
+		});
+
+		prevBtn?.addEventListener('click', () => {
+			viewMonth--;
+			if (viewMonth < 1) { viewMonth = 12; viewYear--; }
+			renderCalendar();
+		});
+		nextBtn?.addEventListener('click', () => {
+			viewMonth++;
+			if (viewMonth > 12) { viewMonth = 1; viewYear++; }
+			renderCalendar();
+		});
+
+		if (checkInEl?.value) {
+			const [y, m] = checkInEl.value.split('-').map(Number);
+			viewYear = y;
+			viewMonth = m;
+		}
+		renderCalendar();
 	</script>
 
 	<style>
@@ -422,6 +645,130 @@ if (Astro.request.method === 'POST') {
 			display: grid;
 			grid-template-columns: 1fr 1fr;
 			gap: 1rem;
+		}
+
+		.avail-calendar {
+			border: 1px solid var(--border-light);
+			border-radius: 0.7rem;
+			padding: 0.9rem;
+		}
+
+		.avail-calendar__head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 0.6rem;
+		}
+
+		.cal-month-label {
+			font-weight: 700;
+			font-size: 0.92rem;
+			text-transform: capitalize;
+		}
+
+		.cal-nav-btn {
+			width: 1.9rem;
+			height: 1.9rem;
+			border-radius: 0.4rem;
+			border: 1px solid var(--border-light);
+			background: #fff;
+			font-size: 1.1rem;
+			line-height: 1;
+			cursor: pointer;
+			color: var(--text-dark);
+		}
+
+		.cal-nav-btn:hover {
+			border-color: var(--accent);
+			color: var(--accent);
+		}
+
+		.avail-calendar__weekdays,
+		.avail-calendar__grid {
+			display: grid;
+			grid-template-columns: repeat(7, 1fr);
+			gap: 0.25rem;
+		}
+
+		.avail-calendar__weekdays {
+			margin-bottom: 0.3rem;
+			font-size: 0.68rem;
+			text-transform: uppercase;
+			letter-spacing: 0.03em;
+			color: var(--text-dark-muted);
+			text-align: center;
+		}
+
+		.cal-cell {
+			aspect-ratio: 1;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			border-radius: 0.4rem;
+			border: none;
+			background: transparent;
+			font: inherit;
+			font-size: 0.82rem;
+			cursor: pointer;
+			color: var(--text-dark);
+		}
+
+		.cal-cell--blank {
+			cursor: default;
+		}
+
+		.cal-cell--past {
+			color: var(--border-light);
+			cursor: not-allowed;
+		}
+
+		.cal-cell--busy {
+			color: #d7a0a0;
+			text-decoration: line-through;
+			cursor: not-allowed;
+		}
+
+		.cal-cell--free:hover {
+			background: rgba(0, 114, 206, 0.1);
+		}
+
+		.cal-cell--in-range {
+			background: rgba(0, 114, 206, 0.12);
+		}
+
+		.cal-cell--edge {
+			background: var(--accent);
+			color: #fff;
+			font-weight: 700;
+		}
+
+		.avail-calendar__legend {
+			display: flex;
+			gap: 1rem;
+			margin-top: 0.7rem;
+			font-size: 0.72rem;
+			color: var(--text-dark-muted);
+		}
+
+		.avail-calendar__legend span {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.35rem;
+		}
+
+		.cal-dot {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			display: inline-block;
+		}
+
+		.cal-dot--free {
+			background: var(--accent);
+		}
+
+		.cal-dot--busy {
+			background: #d7a0a0;
 		}
 
 		.section-heading {
@@ -561,6 +908,19 @@ if (Astro.request.method === 'POST') {
 			display: flex;
 			flex-direction: column;
 			gap: 0.15rem;
+		}
+
+		.summary-subtotal-row,
+		.summary-discount-row {
+			display: flex;
+			justify-content: space-between;
+			font-size: 0.8rem;
+			font-weight: 400;
+			color: var(--text-dark-muted);
+		}
+
+		.summary-discount-row {
+			color: #2e7d4f;
 		}
 
 		@media (max-width: 760px) {

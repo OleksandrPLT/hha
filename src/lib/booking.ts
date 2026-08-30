@@ -5,7 +5,7 @@
 // відстежується тут — лише брони, оформлені через наш власний віджет.
 
 import { db } from '../db/client';
-import { bookings } from '../db/schema';
+import { bookings, promotions } from '../db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 
 // Статуси, що фактично займають дати. 'cancelled' звільняє дати одразу.
@@ -38,7 +38,7 @@ export function isValidDateRange(checkIn: string, checkOut: string): boolean {
 
 // Дві брони перетинаються, якщо checkIn_A < checkOut_B ТА checkOut_A > checkIn_B
 // (стандартна перевірка перетину напіввідкритих інтервалів [checkIn, checkOut)).
-function rangesOverlap(aIn: string, aOut: string, bIn: string, bOut: string): boolean {
+export function rangesOverlap(aIn: string, aOut: string, bIn: string, bOut: string): boolean {
 	return aIn < bOut && aOut > bIn;
 }
 
@@ -66,4 +66,64 @@ export function isRoomAvailable(
 	excludeBookingId?: number,
 ): boolean {
 	return occupiedCount(roomId, checkIn, checkOut, excludeBookingId) < quantity;
+}
+
+// Візуальний календар (Фаза 4, 2026-08-30 — "все налаштувати вільні
+// місця") — доступність по кожному дню місяця одним запитом, замість
+// окремого AJAX на кожну дату. year/month — 1-based місяць (1=січень).
+export interface DayAvailability {
+	date: string; // 'YYYY-MM-DD'
+	available: boolean;
+}
+
+export function getMonthAvailability(roomId: number, quantity: number, year: number, month: number): DayAvailability[] {
+	const daysInMonth = new Date(year, month, 0).getDate();
+	const existing = db
+		.select()
+		.from(bookings)
+		.where(and(eq(bookings.roomId, roomId), inArray(bookings.status, [...BLOCKING_STATUSES])))
+		.all();
+
+	const result: DayAvailability[] = [];
+	for (let day = 1; day <= daysInMonth; day++) {
+		const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+		const nextDate = `${year}-${String(month).padStart(2, '0')}-${String(day + 1).padStart(2, '0')}`;
+		// Кожен день перевіряємо як окрему добу [date, date+1) — простіше й
+		// достатньо для календарної "зайнято/вільно" мітки клітинки; реальна
+		// перевірка діапазону при бронюванні все одно йде через isRoomAvailable.
+		const occupied = existing.filter((b) => rangesOverlap(date, nextDate, b.checkIn, b.checkOut)).length;
+		result.push({ date, available: occupied < quantity });
+	}
+	return result;
+}
+
+// Акції/знижки (2026-08-30 — "розділ промоакцій щоб робити знижки").
+// Автоматичні, без кодів: підходить, якщо активна, дати перетинаються з
+// [checkIn, checkOut), і roomId або null (всі номери), або збігається.
+// Кілька підхожих знижок — беремо ту, що дає найбільшу знижку в грошах
+// (не сумуємо).
+export interface AppliedPromotion {
+	id: number;
+	label: string;
+	discountCents: number;
+}
+
+export function findBestPromotion(roomId: number, checkIn: string, checkOut: string, baseTotalCents: number): AppliedPromotion | null {
+	const candidates = db.select().from(promotions).where(eq(promotions.isActive, true)).all();
+
+	let best: AppliedPromotion | null = null;
+	for (const p of candidates) {
+		if (p.roomId != null && p.roomId !== roomId) continue;
+		if (!rangesOverlap(checkIn, checkOut, p.startDate, p.endDate)) continue;
+
+		const discountCents =
+			p.discountType === 'percent'
+				? Math.round((baseTotalCents * Math.min(100, Math.max(0, p.discountValue))) / 100)
+				: Math.min(baseTotalCents, Math.max(0, p.discountValue));
+
+		if (discountCents > 0 && (!best || discountCents > best.discountCents)) {
+			best = { id: p.id, label: p.label, discountCents };
+		}
+	}
+	return best;
 }

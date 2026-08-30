@@ -232,7 +232,13 @@ export const bookings = sqliteTable('bookings', {
 	guestsCount: integer('guests_count').notNull().default(1),
 
 	pricePerNightCents: integer('price_per_night_cents').notNull(),
+	// totalCents — вже ПІСЛЯ знижки (реальна сума до оплати). discountCents/
+	// promotionId — знімок застосованої акції на момент бронювання (та
+	// сама причина, що й pricePerNightCents-снепшот: пізніша зміна/
+	// видалення акції не повинна заднім числом міняти вже оформлені брони).
 	totalCents: integer('total_cents').notNull(),
+	discountCents: integer('discount_cents').notNull().default(0),
+	promotionId: integer('promotion_id').references(() => promotions.id, { onDelete: 'set null' }),
 
 	status: text('status').notNull().default('pending'),
 	paymentStatus: text('payment_status').notNull().default('unpaid'),
@@ -376,3 +382,28 @@ export const checkinCards = sqliteTable('checkin_cards', {
 
 export type CheckinCard = typeof checkinCards.$inferSelect;
 export type NewCheckinCard = typeof checkinCards.$inferInsert;
+
+// Акції/знижки (за проханням користувача 2026-08-30 — "розділ промоакцій
+// щоб робити знижки"). Без кодів купонів (гість нічого не вводить) —
+// автоматично застосовується, якщо дати бронювання перетинаються з
+// [startDate, endDate] знижки і номер підходить (roomId=null — на всі
+// номери). discountType: 'percent' (1-100) | 'fixed' (€, в центах, за всю
+// бронь). Кілька активних знижок на ті самі дати теоретично можливі —
+// застосовуємо ту, що дає найбільшу знижку (не сумуємо, щоб не піти в
+// мінус і не заплутати гостя).
+export const promotions = sqliteTable('promotions', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	roomId: integer('room_id').references(() => rooms.id, { onDelete: 'cascade' }),
+	label: text('label').notNull(),
+	discountType: text('discount_type').notNull(),
+	discountValue: integer('discount_value').notNull(),
+	startDate: text('start_date').notNull(),
+	endDate: text('end_date').notNull(),
+	isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+	createdAt: text('created_at')
+		.notNull()
+		.default(sql`(current_timestamp)`),
+});
+
+export type Promotion = typeof promotions.$inferSelect;
+export type NewPromotion = typeof promotions.$inferInsert;

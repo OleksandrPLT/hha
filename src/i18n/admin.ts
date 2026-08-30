@@ -13,7 +13,7 @@ export function isAdminLocale(value: string | undefined | null): value is AdminL
 }
 
 export interface AdminCopy {
-	nav: { overview: string; rooms: string; bookings: string; guests: string; checkin: string; logout: string; brand: string; brandSub: string };
+	nav: { overview: string; rooms: string; bookings: string; guests: string; checkin: string; promotions: string; logout: string; brand: string; brandSub: string };
 	login: { title: string; subtitle: string; email: string; password: string; submit: string; errorInvalid: string };
 	overview: {
 		title: string;
@@ -268,11 +268,49 @@ export interface AdminCopy {
 		verifiedBy: string;
 		notice: string;
 	};
+	promotionsList: {
+		title: string;
+		subtitle: string;
+		addBtn: string;
+		empty: string;
+		colLabel: string;
+		colRoom: string;
+		colDiscount: string;
+		colDates: string;
+		colStatus: string;
+		allRooms: string;
+		active: string;
+		inactive: string;
+	};
+	promotionEdit: {
+		back: string;
+		titleNew: string;
+		label: string;
+		labelPlaceholder: string;
+		room: string;
+		allRoomsOption: string;
+		discountType: string;
+		discountTypePercent: string;
+		discountTypeFixed: string;
+		discountValue: string;
+		discountValueHintPercent: string;
+		discountValueHintFixed: string;
+		startDate: string;
+		endDate: string;
+		isActive: string;
+		createBtn: string;
+		saveBtn: string;
+		deleteBtn: string;
+		confirmDelete: string;
+		errorRequired: string;
+		errorDates: string;
+		savedNotice: string;
+	};
 }
 
 export const admin: Record<AdminLocale, AdminCopy> = {
 	uk: {
-		nav: { overview: 'Огляд', rooms: 'Номери', bookings: 'Бронювання', guests: 'Гості', checkin: 'Картки гостей', logout: 'Вийти', brand: 'Hostel 3A', brandSub: 'Адмін-панель' },
+		nav: { overview: 'Огляд', rooms: 'Номери', bookings: 'Бронювання', guests: 'Гості', checkin: 'Картки гостей', promotions: 'Акції', logout: 'Вийти', brand: 'Hostel 3A', brandSub: 'Адмін-панель' },
 		login: {
 			title: 'Адмін-панель',
 			subtitle: 'Hostel & Hotel Apartments',
@@ -534,9 +572,47 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			verifiedBy: 'Перевірив',
 			notice: 'Збережено.',
 		},
+		promotionsList: {
+			title: 'Акції',
+			subtitle: 'Автоматичні знижки на бронювання — застосовуються без промокодів, якщо дати перетинаються з акцією.',
+			addBtn: '+ Додати акцію',
+			empty: 'Ще немає жодної акції.',
+			colLabel: 'Назва',
+			colRoom: 'Номер',
+			colDiscount: 'Знижка',
+			colDates: 'Період',
+			colStatus: 'Статус',
+			allRooms: 'Усі номери',
+			active: 'Активна',
+			inactive: 'Вимкнена',
+		},
+		promotionEdit: {
+			back: '← Усі акції',
+			titleNew: 'Нова акція',
+			label: 'Назва акції',
+			labelPlaceholder: 'напр. Знижка на довгі вихідні',
+			room: 'Номер',
+			allRoomsOption: 'Усі номери',
+			discountType: 'Тип знижки',
+			discountTypePercent: 'Відсоток (%)',
+			discountTypeFixed: 'Фіксована сума (€)',
+			discountValue: 'Розмір знижки',
+			discountValueHintPercent: 'Наприклад, 15 — це 15% від суми бронювання.',
+			discountValueHintFixed: 'Сума в євро, віднімається від загальної суми бронювання.',
+			startDate: 'Діє з',
+			endDate: 'Діє по',
+			isActive: 'Активна',
+			createBtn: 'Створити акцію',
+			saveBtn: 'Зберегти зміни',
+			deleteBtn: 'Видалити акцію',
+			confirmDelete: 'Видалити цю акцію назавжди?',
+			errorRequired: "Заповніть назву, розмір знижки і період дії.",
+			errorDates: 'Дата "по" має бути пізніше дати "з".',
+			savedNotice: 'Збережено.',
+		},
 	},
 	ru: {
-		nav: { overview: 'Обзор', rooms: 'Номера', bookings: 'Бронирования', guests: 'Гости', checkin: 'Карты гостей', logout: 'Выйти', brand: 'Hostel 3A', brandSub: 'Админ-панель' },
+		nav: { overview: 'Обзор', rooms: 'Номера', bookings: 'Бронирования', guests: 'Гости', checkin: 'Карты гостей', promotions: 'Акции', logout: 'Выйти', brand: 'Hostel 3A', brandSub: 'Админ-панель' },
 		login: {
 			title: 'Админ-панель',
 			subtitle: 'Hostel & Hotel Apartments',
@@ -797,6 +873,44 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			verifyBtn: 'Подтвердить проверку документа',
 			verifiedBy: 'Проверил',
 			notice: 'Сохранено.',
+		},
+		promotionsList: {
+			title: 'Акции',
+			subtitle: 'Автоматические скидки на бронирование — применяются без промокодов, если даты пересекаются с акцией.',
+			addBtn: '+ Добавить акцию',
+			empty: 'Ещё нет ни одной акции.',
+			colLabel: 'Название',
+			colRoom: 'Номер',
+			colDiscount: 'Скидка',
+			colDates: 'Период',
+			colStatus: 'Статус',
+			allRooms: 'Все номера',
+			active: 'Активна',
+			inactive: 'Отключена',
+		},
+		promotionEdit: {
+			back: '← Все акции',
+			titleNew: 'Новая акция',
+			label: 'Название акции',
+			labelPlaceholder: 'напр. Скидка на длинные выходные',
+			room: 'Номер',
+			allRoomsOption: 'Все номера',
+			discountType: 'Тип скидки',
+			discountTypePercent: 'Процент (%)',
+			discountTypeFixed: 'Фиксированная сумма (€)',
+			discountValue: 'Размер скидки',
+			discountValueHintPercent: 'Например, 15 — это 15% от суммы бронирования.',
+			discountValueHintFixed: 'Сумма в евро, вычитается из общей суммы бронирования.',
+			startDate: 'Действует с',
+			endDate: 'Действует по',
+			isActive: 'Активна',
+			createBtn: 'Создать акцию',
+			saveBtn: 'Сохранить изменения',
+			deleteBtn: 'Удалить акцию',
+			confirmDelete: 'Удалить эту акцию навсегда?',
+			errorRequired: 'Заполните название, размер скидки и период действия.',
+			errorDates: 'Дата "по" должна быть позже даты "с".',
+			savedNotice: 'Сохранено.',
 		},
 	},
 };

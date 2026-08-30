@@ -1,0 +1,208 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../db/client';
+import { admins, promotions, rooms } from '../../../db/schema';
+import { eq, desc } from 'drizzle-orm';
+import { getAdminLocale, admin as adminCopy } from '../../../i18n/admin';
+import { currency } from '../../../data/pricing';
+
+export const prerender = false;
+
+const adminId = await Astro.session?.get('adminId');
+if (!adminId) {
+	return Astro.redirect('/admin/login');
+}
+const currentAdmin = db.select().from(admins).where(eq(admins.id, adminId)).get();
+if (!currentAdmin) {
+	return Astro.redirect('/admin/login');
+}
+
+const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = adminCopy[locale].promotionsList;
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	const action = String(form.get('action') || '');
+	const promoId = Number(form.get('promoId'));
+	if (action === 'toggle-active' && Number.isInteger(promoId)) {
+		const p = db.select().from(promotions).where(eq(promotions.id, promoId)).get();
+		if (p) db.update(promotions).set({ isActive: !p.isActive }).where(eq(promotions.id, promoId)).run();
+	}
+	return Astro.redirect('/admin/promotions');
+}
+
+const allPromotions = db.select().from(promotions).orderBy(desc(promotions.createdAt)).all();
+const roomsById = new Map(db.select().from(rooms).all().map((r) => [r.id, r]));
+
+function roomTitle(roomId: number | null): string {
+	if (roomId == null) return copy.allRooms;
+	const room = roomsById.get(roomId);
+	if (!room) return '—';
+	try {
+		const parsed = JSON.parse(room.titles) as Record<string, string>;
+		return parsed.en ?? room.slug;
+	} catch {
+		return room.slug;
+	}
+}
+
+function discountLabel(p: (typeof allPromotions)[number]): string {
+	return p.discountType === 'percent' ? `${p.discountValue}%` : `${currency}${(p.discountValue / 100).toFixed(2)}`;
+}
+---
+
+<AdminLayout title={copy.title} adminName={currentAdmin.fullName} activeNav="promotions">
+	<div class="page-head">
+		<h1>{copy.title}</h1>
+		<a href="/admin/promotions/new" class="btn-primary">{copy.addBtn}</a>
+	</div>
+	<p class="page-subtitle">{copy.subtitle}</p>
+
+	{
+		allPromotions.length === 0 ? (
+			<p class="empty-note">{copy.empty}</p>
+		) : (
+			<div class="table-wrap">
+				<table>
+					<thead>
+						<tr>
+							<th>{copy.colLabel}</th>
+							<th>{copy.colRoom}</th>
+							<th>{copy.colDiscount}</th>
+							<th>{copy.colDates}</th>
+							<th>{copy.colStatus}</th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody>
+						{allPromotions.map((p) => (
+							<tr>
+								<td><a href={`/admin/promotions/${p.id}`}>{p.label}</a></td>
+								<td>{roomTitle(p.roomId)}</td>
+								<td>{discountLabel(p)}</td>
+								<td class="mono">
+									{p.startDate} → {p.endDate}
+								</td>
+								<td>
+									<form method="POST">
+										<input type="hidden" name="action" value="toggle-active" />
+										<input type="hidden" name="promoId" value={p.id} />
+										<button type="submit" class={p.isActive ? 'status-badge status-badge--active' : 'status-badge'}>
+											{p.isActive ? copy.active : copy.inactive}
+										</button>
+									</form>
+								</td>
+								<td><a href={`/admin/promotions/${p.id}`} class="edit-link">→</a></td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+		)
+	}
+
+	<style>
+		.page-head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 0.4rem;
+		}
+
+		h1 {
+			margin: 0;
+			font-size: 1.4rem;
+			font-weight: 700;
+		}
+
+		.btn-primary {
+			height: 2.2rem;
+			padding: 0 1rem;
+			display: inline-flex;
+			align-items: center;
+			border-radius: 0.5rem;
+			background: var(--bg-dark);
+			color: var(--cream);
+			font-size: 0.82rem;
+			font-weight: 700;
+			text-decoration: none;
+			flex-shrink: 0;
+		}
+
+		.page-subtitle {
+			margin: 0 0 1.25rem;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+			max-width: 40rem;
+		}
+
+		.empty-note {
+			color: var(--text-dark-muted);
+			font-size: 0.88rem;
+		}
+
+		.table-wrap {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			overflow-x: auto;
+		}
+
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 0.85rem;
+		}
+
+		th,
+		td {
+			text-align: left;
+			padding: 0.65rem 1rem;
+			white-space: nowrap;
+			vertical-align: middle;
+		}
+
+		.mono {
+			font-size: 0.78rem;
+			color: var(--text-dark-muted);
+		}
+
+		thead th {
+			font-size: 0.72rem;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			color: var(--text-dark-muted);
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		tbody tr:not(:last-child) td {
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		tbody a {
+			color: var(--accent);
+			font-weight: 600;
+			text-decoration: none;
+		}
+
+		tbody a:hover {
+			text-decoration: underline;
+		}
+
+		.status-badge {
+			border: none;
+			border-radius: 999px;
+			padding: 0.25rem 0.7rem;
+			font-size: 0.72rem;
+			font-weight: 700;
+			cursor: pointer;
+			background: var(--border-light);
+			color: var(--text-dark-muted);
+		}
+
+		.status-badge--active {
+			background: rgba(63, 122, 79, 0.12);
+			color: var(--success);
+		}
+	</style>
+</AdminLayout>
