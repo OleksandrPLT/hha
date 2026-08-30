@@ -1,5 +1,6 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import BookingSourceIcon from '../../../components/BookingSourceIcon.astro';
 import { db } from '../../../db/client';
 import { admins, bookings, rooms } from '../../../db/schema';
 import { eq, desc } from 'drizzle-orm';
@@ -48,6 +49,12 @@ const paymentLabels: Record<string, string> = {
 	paid: copy.paymentPaid,
 	refunded: copy.paymentRefunded,
 };
+const sourceLabels: Record<string, string> = {
+	website: copy.sourceWebsite,
+	phone: copy.sourcePhone,
+	email: copy.sourceEmail,
+	booking_com: copy.sourceBookingCom,
+};
 
 function euro(cents: number): string {
 	return `${currency}${(cents / 100).toFixed(2)}`;
@@ -57,6 +64,7 @@ function euro(cents: number): string {
 <AdminLayout title={copy.title} adminName={currentAdmin.fullName} activeNav="bookings">
 	<div class="page-head">
 		<h1>{copy.title}</h1>
+		<a href="/admin/bookings/new" class="btn-primary">{copy.addBtn}</a>
 	</div>
 	<p class="page-subtitle">{copy.subtitle}</p>
 
@@ -80,6 +88,7 @@ function euro(cents: number): string {
 					<thead>
 						<tr>
 							<th>{copy.colId}</th>
+							<th>{copy.colSource}</th>
 							<th>{copy.colRoom}</th>
 							<th>{copy.colGuest}</th>
 							<th>{copy.colDates}</th>
@@ -92,6 +101,9 @@ function euro(cents: number): string {
 						{filtered.map((b) => (
 							<tr>
 								<td><a href={`/admin/bookings/${b.id}`}>#{b.id}</a></td>
+								<td class="source-cell" title={sourceLabels[b.source] ?? b.source}>
+									<BookingSourceIcon source={b.source} />
+								</td>
 								<td>{roomTitle(b.roomId)}</td>
 								<td>{b.fullName}</td>
 								<td class="mono">{b.checkIn} → {b.checkOut}</td>
@@ -125,6 +137,24 @@ function euro(cents: number): string {
 			font-size: 0.85rem;
 			color: var(--text-dark-muted);
 			max-width: 40rem;
+		}
+
+		.btn-primary {
+			height: 2.2rem;
+			padding: 0 1rem;
+			display: inline-flex;
+			align-items: center;
+			border-radius: 0.5rem;
+			background: var(--bg-dark);
+			color: var(--cream);
+			font-size: 0.82rem;
+			font-weight: 700;
+			text-decoration: none;
+			flex-shrink: 0;
+		}
+
+		.source-cell {
+			color: var(--text-dark-muted);
 		}
 
 		.filter-row {

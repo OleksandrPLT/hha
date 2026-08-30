@@ -19,6 +19,8 @@ import { isValidDateRange, nightsBetween, isRoomAvailable } from '../../../lib/b
 import { isRevolutConfigured, createRevolutOrder } from '../../../lib/revolut';
 import { vatRatePercent, currency } from '../../../data/pricing';
 import { sendMail } from '../../../lib/mailer';
+import { renderEmailHtml } from '../../../lib/emailTemplate';
+import { formatBookingRef } from '../../../lib/memberCard';
 
 export const prerender = false;
 
@@ -136,11 +138,24 @@ if (Astro.request.method === 'POST') {
 		}
 
 		try {
-			await sendMail(
-				email,
-				bookingCopy[locale].meta.title,
-				`<p>${bookingCopy[locale].confirmation.heading}</p><p>${roomTitle}, ${checkIn} → ${checkOut} (${nights} ${copy.summaryNights})</p><p>${copy.summaryTotal}: ${currency}${(totalCents / 100).toFixed(2)}</p>`,
-			);
+			const ref = formatBookingRef(bookingId);
+			const html = renderEmailHtml({
+				heading: bookingCopy[locale].confirmation.heading,
+				bodyHtml: `
+					<p>${bookingCopy[locale].confirmation.subheading}</p>
+					<table role="presentation" cellpadding="0" cellspacing="0" style="margin:1rem 0;background:#f5f6f8;border-radius:8px;width:100%;">
+						<tr><td style="padding:0.9rem 1.1rem;">
+							<p style="margin:0 0 0.3rem;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;color:#5b6068;">${bookingCopy[locale].confirmation.refLabel}</p>
+							<p style="margin:0;font-size:1.15rem;font-weight:800;letter-spacing:0.02em;">${ref}</p>
+						</td></tr>
+					</table>
+					<p style="margin:0 0 0.3rem;"><strong>${roomTitle}</strong></p>
+					<p style="margin:0 0 0.3rem;">${checkIn} → ${checkOut} (${nights} ${copy.summaryNights})</p>
+					<p style="margin:0;">${copy.summaryTotal}: ${currency}${(totalCents / 100).toFixed(2)}</p>
+				`,
+				footerNote: paymentMethod === 'revolut' ? undefined : bookingCopy[locale].confirmation.payAtCheckinNote,
+			});
+			await sendMail(email, `${bookingCopy[locale].meta.title} — ${ref}`, html);
 		} catch {
 			// SMTP може бути не налаштований/недоступний — бронювання все одно валідне.
 		}

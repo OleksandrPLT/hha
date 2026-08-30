@@ -13,7 +13,7 @@ export function isAdminLocale(value: string | undefined | null): value is AdminL
 }
 
 export interface AdminCopy {
-	nav: { overview: string; rooms: string; bookings: string; guests: string; logout: string; brand: string; brandSub: string };
+	nav: { overview: string; rooms: string; bookings: string; guests: string; checkin: string; logout: string; brand: string; brandSub: string };
 	login: { title: string; subtitle: string; email: string; password: string; submit: string; errorInvalid: string };
 	overview: {
 		title: string;
@@ -144,6 +144,7 @@ export interface AdminCopy {
 		title: string;
 		subtitle: string;
 		empty: string;
+		addBtn: string;
 		colId: string;
 		colRoom: string;
 		colGuest: string;
@@ -151,6 +152,7 @@ export interface AdminCopy {
 		colTotal: string;
 		colStatus: string;
 		colPayment: string;
+		colSource: string;
 		filterAll: string;
 		statusPending: string;
 		statusConfirmed: string;
@@ -159,6 +161,29 @@ export interface AdminCopy {
 		paymentUnpaid: string;
 		paymentPaid: string;
 		paymentRefunded: string;
+		sourceWebsite: string;
+		sourcePhone: string;
+		sourceEmail: string;
+		sourceBookingCom: string;
+	};
+	bookingNew: {
+		title: string;
+		subtitle: string;
+		room: string;
+		source: string;
+		fullName: string;
+		email: string;
+		phone: string;
+		checkIn: string;
+		checkOut: string;
+		guestsCount: string;
+		pricePerNight: string;
+		pricePerNightHint: string;
+		alreadyPaid: string;
+		createBtn: string;
+		errorRequired: string;
+		errorDates: string;
+		availabilityWarning: string;
 	};
 	bookingDetail: {
 		back: string;
@@ -193,11 +218,57 @@ export interface AdminCopy {
 		pointsAwarded: string;
 		notice: string;
 	};
+	checkinList: {
+		title: string;
+		subtitle: string;
+		empty: string;
+		colId: string;
+		colName: string;
+		colDates: string;
+		colStay: string;
+		colVerified: string;
+		verifiedYes: string;
+		verifiedNo: string;
+	};
+	checkinDetail: {
+		back: string;
+		personalSection: string;
+		firstName: string;
+		lastName: string;
+		dateOfBirth: string;
+		citizenship: string;
+		addressSection: string;
+		country: string;
+		city: string;
+		street: string;
+		zip: string;
+		contactSection: string;
+		phone: string;
+		email: string;
+		accompanyingSection: string;
+		noAccompanying: string;
+		staySection: string;
+		arrivalDate: string;
+		departureDate: string;
+		signatureSection: string;
+		signedAt: string;
+		receptionSection: string;
+		receptionHint: string;
+		roomBedNumber: string;
+		documentType: string;
+		documentTypePassport: string;
+		documentTypeId: string;
+		documentTypeOther: string;
+		documentNumber: string;
+		verifyBtn: string;
+		verifiedBy: string;
+		notice: string;
+	};
 }
 
 export const admin: Record<AdminLocale, AdminCopy> = {
 	uk: {
-		nav: { overview: 'Огляд', rooms: 'Номери', bookings: 'Бронювання', guests: 'Гості', logout: 'Вийти', brand: 'Hostel 3A', brandSub: 'Адмін-панель' },
+		nav: { overview: 'Огляд', rooms: 'Номери', bookings: 'Бронювання', guests: 'Гості', checkin: 'Картки гостей', logout: 'Вийти', brand: 'Hostel 3A', brandSub: 'Адмін-панель' },
 		login: {
 			title: 'Адмін-панель',
 			subtitle: 'Hostel & Hotel Apartments',
@@ -335,6 +406,7 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			title: 'Бронювання',
 			subtitle: 'Власний календар бронювань сайту (без синхронізації з Booking.com чи іншими каналами).',
 			empty: 'Ще немає жодного бронювання.',
+			addBtn: '+ Додати бронювання',
 			colId: '№',
 			colRoom: 'Номер',
 			colGuest: 'Гість',
@@ -342,6 +414,7 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			colTotal: 'Сума',
 			colStatus: 'Статус',
 			colPayment: 'Оплата',
+			colSource: 'Джерело',
 			filterAll: 'Усі',
 			statusPending: 'Очікує',
 			statusConfirmed: 'Підтверджено',
@@ -350,6 +423,29 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			paymentUnpaid: 'Не оплачено',
 			paymentPaid: 'Оплачено',
 			paymentRefunded: 'Повернено',
+			sourceWebsite: 'Сайт',
+			sourcePhone: 'Телефон',
+			sourceEmail: 'Email',
+			sourceBookingCom: 'Booking.com',
+		},
+		bookingNew: {
+			title: 'Нове бронювання',
+			subtitle: 'Внести бронювання, яке прийшло не через сайт (телефон, email, Booking.com).',
+			room: 'Номер',
+			source: 'Джерело',
+			fullName: "Ім'я гостя",
+			email: 'Email',
+			phone: 'Телефон',
+			checkIn: 'Заїзд',
+			checkOut: 'Виїзд',
+			guestsCount: 'Гостей',
+			pricePerNight: 'Ціна/ніч (€, з ПДВ)',
+			pricePerNightHint: 'Підставлено поточну ціну номера — можна змінити для індивідуального тарифу.',
+			alreadyPaid: 'Вже оплачено',
+			createBtn: 'Створити бронювання',
+			errorRequired: "Заповніть усі обов'язкові поля.",
+			errorDates: 'Перевірте дати заїзду/виїзду.',
+			availabilityWarning: '⚠ На ці дати вже є інше бронювання цього номера — перевірте перед збереженням.',
 		},
 		bookingDetail: {
 			back: '← Усі бронювання',
@@ -384,9 +480,55 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			pointsAwarded: 'Бали вже нараховано за це бронювання.',
 			notice: 'Збережено.',
 		},
+		checkinList: {
+			title: 'Картки гостей',
+			subtitle: 'Külastajakaart — електронний облік проживаючих (зберігається 2 роки за естонським законом).',
+			empty: 'Ще немає жодної картки.',
+			colId: '№',
+			colName: "Ім'я",
+			colDates: 'Заповнено',
+			colStay: 'Проживання',
+			colVerified: 'Документ',
+			verifiedYes: 'Перевірено',
+			verifiedNo: 'Не перевірено',
+		},
+		checkinDetail: {
+			back: '← Усі картки',
+			personalSection: 'Особисті дані',
+			firstName: "Ім'я",
+			lastName: 'Прізвище',
+			dateOfBirth: 'Дата народження',
+			citizenship: 'Громадянство',
+			addressSection: 'Адреса постійного проживання',
+			country: 'Країна',
+			city: 'Місто',
+			street: 'Вулиця, будинок, квартира',
+			zip: 'Поштовий індекс',
+			contactSection: 'Контактні дані',
+			phone: 'Телефон',
+			email: 'Email',
+			accompanyingSection: 'Супроводжуючі особи',
+			noAccompanying: 'Немає.',
+			staySection: 'Деталі перебування',
+			arrivalDate: 'Дата заїзду',
+			departureDate: 'Дата виїзду',
+			signatureSection: 'Підпис гостя',
+			signedAt: 'Підписано',
+			receptionSection: 'Для адміністратора',
+			receptionHint: 'Заповнити ПІСЛЯ звірки з оригіналом паспорта/ID-картки гостя.',
+			roomBedNumber: 'Номер кімнати (ліжка)',
+			documentType: 'Тип документа',
+			documentTypePassport: 'Паспорт',
+			documentTypeId: 'ID-картка',
+			documentTypeOther: 'Інше',
+			documentNumber: 'Номер документа',
+			verifyBtn: 'Підтвердити перевірку документа',
+			verifiedBy: 'Перевірив',
+			notice: 'Збережено.',
+		},
 	},
 	ru: {
-		nav: { overview: 'Обзор', rooms: 'Номера', bookings: 'Бронирования', guests: 'Гости', logout: 'Выйти', brand: 'Hostel 3A', brandSub: 'Админ-панель' },
+		nav: { overview: 'Обзор', rooms: 'Номера', bookings: 'Бронирования', guests: 'Гости', checkin: 'Карты гостей', logout: 'Выйти', brand: 'Hostel 3A', brandSub: 'Админ-панель' },
 		login: {
 			title: 'Админ-панель',
 			subtitle: 'Hostel & Hotel Apartments',
@@ -524,6 +666,7 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			title: 'Бронирования',
 			subtitle: 'Собственный календарь бронирований сайта (без синхронизации с Booking.com и другими каналами).',
 			empty: 'Ещё нет ни одного бронирования.',
+			addBtn: '+ Добавить бронирование',
 			colId: '№',
 			colRoom: 'Номер',
 			colGuest: 'Гость',
@@ -531,6 +674,7 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			colTotal: 'Сумма',
 			colStatus: 'Статус',
 			colPayment: 'Оплата',
+			colSource: 'Источник',
 			filterAll: 'Все',
 			statusPending: 'Ожидает',
 			statusConfirmed: 'Подтверждено',
@@ -539,6 +683,29 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			paymentUnpaid: 'Не оплачено',
 			paymentPaid: 'Оплачено',
 			paymentRefunded: 'Возвращено',
+			sourceWebsite: 'Сайт',
+			sourcePhone: 'Телефон',
+			sourceEmail: 'Email',
+			sourceBookingCom: 'Booking.com',
+		},
+		bookingNew: {
+			title: 'Новое бронирование',
+			subtitle: 'Внести бронирование, которое пришло не через сайт (телефон, email, Booking.com).',
+			room: 'Номер',
+			source: 'Источник',
+			fullName: 'Имя гостя',
+			email: 'Email',
+			phone: 'Телефон',
+			checkIn: 'Заезд',
+			checkOut: 'Выезд',
+			guestsCount: 'Гостей',
+			pricePerNight: 'Цена/ночь (€, с НДС)',
+			pricePerNightHint: 'Подставлена текущая цена номера — можно изменить для индивидуального тарифа.',
+			alreadyPaid: 'Уже оплачено',
+			createBtn: 'Создать бронирование',
+			errorRequired: 'Заполните все обязательные поля.',
+			errorDates: 'Проверьте даты заезда/выезда.',
+			availabilityWarning: '⚠ На эти даты уже есть другое бронирование этого номера — проверьте перед сохранением.',
 		},
 		bookingDetail: {
 			back: '← Все бронирования',
@@ -571,6 +738,52 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			setCompleted: 'Завершить проживание',
 			completedHint: 'При завершении гостю с аккаунтом автоматически начислятся баллы лояльности.',
 			pointsAwarded: 'Баллы уже начислены за это бронирование.',
+			notice: 'Сохранено.',
+		},
+		checkinList: {
+			title: 'Карты гостей',
+			subtitle: 'Külastajakaart — электронный учёт проживающих (хранится 2 года по эстонскому закону).',
+			empty: 'Ещё нет ни одной карты.',
+			colId: '№',
+			colName: 'Имя',
+			colDates: 'Заполнено',
+			colStay: 'Проживание',
+			colVerified: 'Документ',
+			verifiedYes: 'Проверено',
+			verifiedNo: 'Не проверено',
+		},
+		checkinDetail: {
+			back: '← Все карты',
+			personalSection: 'Личные данные',
+			firstName: 'Имя',
+			lastName: 'Фамилия',
+			dateOfBirth: 'Дата рождения',
+			citizenship: 'Гражданство',
+			addressSection: 'Адрес постоянного проживания',
+			country: 'Страна',
+			city: 'Город',
+			street: 'Улица, дом, квартира',
+			zip: 'Почтовый индекс',
+			contactSection: 'Контактные данные',
+			phone: 'Телефон',
+			email: 'Email',
+			accompanyingSection: 'Сопровождающие лица',
+			noAccompanying: 'Нет.',
+			staySection: 'Детали проживания',
+			arrivalDate: 'Дата заезда',
+			departureDate: 'Дата выезда',
+			signatureSection: 'Подпись гостя',
+			signedAt: 'Подписано',
+			receptionSection: 'Для администратора',
+			receptionHint: 'Заполнить ПОСЛЕ сверки с оригиналом паспорта/ID-карты гостя.',
+			roomBedNumber: 'Номер комнаты (кровати)',
+			documentType: 'Тип документа',
+			documentTypePassport: 'Паспорт',
+			documentTypeId: 'ID-карта',
+			documentTypeOther: 'Другое',
+			documentNumber: 'Номер документа',
+			verifyBtn: 'Подтвердить проверку документа',
+			verifiedBy: 'Проверил',
 			notice: 'Сохранено.',
 		},
 	},

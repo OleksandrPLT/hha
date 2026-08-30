@@ -6,6 +6,7 @@
 // (той самий pointsForStay, що й в описі схеми), якщо є прив'язаний
 // акаунт і бали ще не нараховувались (pointsAwarded).
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import BookingSourceIcon from '../../../components/BookingSourceIcon.astro';
 import { db } from '../../../db/client';
 import { admins, bookings, rooms, guests, guestNotes } from '../../../db/schema';
 import { eq } from 'drizzle-orm';
@@ -100,6 +101,12 @@ const paymentLabels: Record<string, string> = {
 	paid: listCopy.paymentPaid,
 	refunded: listCopy.paymentRefunded,
 };
+const sourceLabels: Record<string, string> = {
+	website: listCopy.sourceWebsite,
+	phone: listCopy.sourcePhone,
+	email: listCopy.sourceEmail,
+	booking_com: listCopy.sourceBookingCom,
+};
 
 function euro(cents: number): string {
 	return `${currency}${(cents / 100).toFixed(2)}`;
@@ -132,6 +139,13 @@ const bookingPageCopy = bookingCopy[locale].page;
 				<div>
 					<dt>{copy.linkedAccount}</dt>
 					<dd>{linkedGuest ? <a href={`/admin/guests/${linkedGuest.id}`}>{linkedGuest.fullName}</a> : copy.guestBooking}</dd>
+				</div>
+				<div>
+					<dt>{listCopy.colSource}</dt>
+					<dd class="source-dd">
+						<BookingSourceIcon source={bk.source} size={14} />
+						{sourceLabels[bk.source] ?? bk.source}
+					</dd>
 				</div>
 			</dl>
 		</section>
@@ -330,6 +344,13 @@ const bookingPageCopy = bookingCopy[locale].page;
 			margin: 0;
 			text-align: right;
 			font-weight: 600;
+		}
+
+		.source-dd {
+			display: flex;
+			align-items: center;
+			gap: 0.4rem;
+			justify-content: flex-end;
 		}
 
 		dd a {

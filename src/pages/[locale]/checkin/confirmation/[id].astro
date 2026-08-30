@@ -1,0 +1,121 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import SiteHeader from '../../../../components/SiteHeader.astro';
+import SiteFooter from '../../../../components/SiteFooter.astro';
+import { isLocale, defaultLocale, type Locale } from '../../../../i18n/locales';
+import { checkin as checkinCopy } from '../../../../i18n/checkin';
+import { db } from '../../../../db/client';
+import { checkinCards } from '../../../../db/schema';
+import { formatCheckinCode } from '../../../../lib/memberCard';
+import { eq } from 'drizzle-orm';
+
+export const prerender = false;
+
+const rawLocale = Astro.params.locale;
+if (!rawLocale || !isLocale(rawLocale)) {
+	return Astro.redirect(`/${defaultLocale}`);
+}
+const locale: Locale = rawLocale;
+const copy = checkinCopy[locale].confirmation;
+
+const cardId = Number(Astro.params.id);
+const card = Number.isInteger(cardId) ? db.select().from(checkinCards).where(eq(checkinCards.id, cardId)).get() : undefined;
+if (!card) {
+	return Astro.redirect(`/${locale}`);
+}
+---
+
+<BaseLayout locale={locale} title={copy.heading} description={checkinCopy[locale].meta.description} path={`/checkin/confirmation/${cardId}`}>
+	<SiteHeader locale={locale} />
+
+	<main class="confirmation-page">
+		<div class="container">
+			<div class="confirmation-card">
+				<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="check-icon"
+					><circle cx="12" cy="12" r="10"></circle><path d="M8 12l3 3 5-6"></path></svg
+				>
+				<h1>{copy.heading}</h1>
+				<p class="subtitle">{copy.subheading}</p>
+				<p class="code-badge">{formatCheckinCode(card.id)}</p>
+				<p class="note">{copy.emailSent}</p>
+				<a href={`/${locale}`} class="btn btn--ghost-dark">{copy.backHome}</a>
+			</div>
+		</div>
+	</main>
+
+	<SiteFooter locale={locale} />
+
+	<style>
+		.confirmation-page {
+			background: var(--bg-light);
+			min-height: 70vh;
+			padding: 3rem 0 4rem;
+		}
+
+		.container {
+			max-width: 30rem;
+			margin: 0 auto;
+			padding: 0 1.25rem;
+		}
+
+		.confirmation-card {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 1rem;
+			padding: 2.5rem 1.75rem;
+			text-align: center;
+		}
+
+		.check-icon {
+			color: #2e7d4f;
+			margin-bottom: 0.75rem;
+		}
+
+		h1 {
+			margin: 0 0 0.4rem;
+			font-size: clamp(1.4rem, 4vw, 1.8rem);
+			font-weight: 800;
+		}
+
+		.subtitle {
+			margin: 0 0 1.25rem;
+			color: var(--text-dark-muted);
+			font-size: 0.92rem;
+		}
+
+		.note {
+			margin: 0 0 1.5rem;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+		}
+
+		.code-badge {
+			display: inline-block;
+			margin: 0 0 1.25rem;
+			padding: 0.5rem 1rem;
+			border-radius: 0.5rem;
+			background: var(--bg-light);
+			font-size: 1.1rem;
+			font-weight: 800;
+			letter-spacing: 0.03em;
+		}
+
+		.btn {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			padding: 0.75rem 1.2rem;
+			border-radius: 0.6rem;
+			font-weight: 700;
+			font-size: 0.9rem;
+			border: 1px solid var(--border-light);
+			color: var(--text-dark);
+			text-decoration: none;
+		}
+
+		.btn--ghost-dark:hover {
+			border-color: var(--accent);
+			color: var(--accent);
+		}
+	</style>
+</BaseLayout>

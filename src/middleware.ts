@@ -12,14 +12,28 @@
 import 'dotenv/config';
 import { defineMiddleware } from 'astro:middleware';
 import { detectLocaleFromPath, renderComingSoonPage } from './lib/comingSoonPage';
+import { pickLocaleFromAcceptLanguage } from './i18n/locales';
 
 const PREVIEW_COOKIE = 'hha_preview';
 
 export const onRequest = defineMiddleware(async (context, next) => {
+	const url = new URL(context.request.url);
+
+	// checkin.hha.ee — окремий піддомен для Külastajakaart (Фаза 2/3,
+	// 2026-08-30). Це операційний інструмент для гостей, які фізично
+	// заселяються ЗАРАЗ — не залежить від маркетингового Coming Soon
+	// тех-режиму головного сайту, тому пропускаємо гейт повністю. Корінь
+	// "/" одразу веде на форму (не на лендінг, як на hha.ee).
+	if (url.hostname.startsWith('checkin.')) {
+		if (url.pathname === '/') {
+			const locale = pickLocaleFromAcceptLanguage(context.request.headers.get('accept-language'));
+			return context.redirect(`/${locale}/checkin`, 302);
+		}
+		return next();
+	}
+
 	const password = process.env.MAINTENANCE_PASSWORD;
 	if (!password) return next();
-
-	const url = new URL(context.request.url);
 
 	// Telegram сам стукає в наш вебхук (сервер-до-сервера, без будь-яких
 	// cookie) — цей шлях має лишатись доступним незалежно від тех-режиму,

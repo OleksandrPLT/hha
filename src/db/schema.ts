@@ -220,6 +220,12 @@ export const bookings = sqliteTable('bookings', {
 	email: text('email').notNull(),
 	phone: text('phone').notNull(),
 
+	// Канал, яким прийшло бронювання — 'website' (наш власний флоу,
+	// проставляється автоматично) | 'phone' | 'email' | 'booking_com'
+	// (останні три — коли адмін вносить бронювання вручну, бо гість
+	// звернувся не через сайт). За проханням користувача 2026-08-30.
+	source: text('source').notNull().default('website'),
+
 	checkIn: text('check_in').notNull(),
 	checkOut: text('check_out').notNull(),
 	nights: integer('nights').notNull(),
@@ -297,3 +303,68 @@ export const chatMessages = sqliteTable('chat_messages', {
 
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type NewChatMessage = typeof chatMessages.$inferInsert;
+
+// Külastajakaart / картка гостя (Фаза 2/3, закриває відкрите питання №1
+// з ТЗ — точний перелік полів для обліку проживаючих за естонським
+// законом, шаблон надав користувач 2026-08-30). Естонський закон вимагає
+// зберігати заповнені картки 2 роки — тому НІЧОГО не видаляється
+// автоматично; ручне видалення (адмін) можливе, але без auto-purge.
+//
+// bookingId — nullable: картку можна заповнити і без існуючого
+// онлайн-бронювання (walk-in гість). Якщо є — дані бронювання (дати,
+// контакти) підтягуються для автозаповнення.
+//
+// accompanying — JSON-текст [{name, dateOfBirth, citizenship}], бо
+// кількість супроводжуючих осіб довільна (0 і більше).
+//
+// guestSignatureDataUrl — підпис гостя, намальований на canvas (той
+// самий підхід, що й фото профілю/номерів — base64 data URL напряму в
+// SQLite, без файлової системи). guestSignedAt — коли підписано.
+//
+// "Для адміністратора" (секція форми) — заповнюється НЕ гостем, а
+// ресепшеном ПІСЛЯ звірки з оригіналом паспорта/ID: roomBedNumber,
+// documentType/documentNumber, і хто саме перевірив (receptionistId +
+// час) — це вже автентифікована адмін-сесія, тому окремий "підпис
+// адміністратора" на canvas не потрібен (обрано свідомо, замість
+// малювати ще один canvas — авторизований adminId вже дає надійніший
+// аудиторський слід, ніж скан підпису).
+export const checkinCards = sqliteTable('checkin_cards', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	bookingId: integer('booking_id').references(() => bookings.id, { onDelete: 'set null' }),
+
+	firstName: text('first_name').notNull(),
+	lastName: text('last_name').notNull(),
+	dateOfBirth: text('date_of_birth').notNull(),
+	citizenship: text('citizenship').notNull(),
+
+	country: text('country').notNull(),
+	city: text('city').notNull(),
+	street: text('street').notNull(),
+	zipCode: text('zip_code').notNull(),
+
+	phone: text('phone').notNull(),
+	email: text('email').notNull(),
+
+	accompanying: text('accompanying'),
+
+	arrivalDate: text('arrival_date').notNull(),
+	departureDate: text('departure_date').notNull(),
+
+	consentAccepted: integer('consent_accepted', { mode: 'boolean' }).notNull().default(false),
+	guestSignatureDataUrl: text('guest_signature_data_url'),
+	guestSignedAt: text('guest_signed_at'),
+
+	roomBedNumber: text('room_bed_number'),
+	documentType: text('document_type'),
+	documentTypeOther: text('document_type_other'),
+	documentNumber: text('document_number'),
+	receptionistId: integer('receptionist_id').references(() => admins.id),
+	verifiedAt: text('verified_at'),
+
+	createdAt: text('created_at')
+		.notNull()
+		.default(sql`(current_timestamp)`),
+});
+
+export type CheckinCard = typeof checkinCards.$inferSelect;
+export type NewCheckinCard = typeof checkinCards.$inferInsert;

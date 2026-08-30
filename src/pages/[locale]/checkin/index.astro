@@ -1,0 +1,545 @@
+---
+// Külastajakaart / картка гостя (Фаза 2/3, ТЗ відкрите питання №1 —
+// шаблон надав користувач 2026-08-30). Доступна і на hha.ee/[locale]/checkin,
+// і на окремому піддомені checkin.hha.ee (той самий Node-процес, проксі
+// на порт 3001 — middleware.ts на цьому хості веде "/" сюди напряму).
+// Естонський закон вимагає зберігати заповнені картки 2 роки — нічого не
+// видаляється автоматично (див. коментар над checkinCards в schema.ts).
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import SiteHeader from '../../../components/SiteHeader.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import PhoneInput from '../../../components/PhoneInput.astro';
+import { isLocale, defaultLocale, type Locale } from '../../../i18n/locales';
+import { checkin as checkinCopy } from '../../../i18n/checkin';
+import { countries } from '../../../data/countries';
+import { db } from '../../../db/client';
+import { checkinCards, bookings } from '../../../db/schema';
+import { isValidEmail } from '../../../lib/auth';
+import { sendMail } from '../../../lib/mailer';
+import { renderEmailHtml } from '../../../lib/emailTemplate';
+import { formatCheckinCode } from '../../../lib/memberCard';
+import { eq } from 'drizzle-orm';
+
+export const prerender = false;
+
+const rawLocale = Astro.params.locale;
+if (!rawLocale || !isLocale(rawLocale)) {
+	return Astro.redirect(`/${defaultLocale}/checkin`);
+}
+const locale: Locale = rawLocale;
+const copy = checkinCopy[locale];
+
+// Якщо прийшли з посилання на конкретне бронювання (?bookingId=) —
+// підтягуємо контакти/дати для автозаповнення (не обов'язково: картку
+// можна заповнити і без бронювання, walk-in гість).
+const bookingIdParam = Astro.url.searchParams.get('bookingId');
+const linkedBooking = bookingIdParam && Number.isInteger(Number(bookingIdParam)) ? db.select().from(bookings).where(eq(bookings.id, Number(bookingIdParam))).get() : undefined;
+
+interface AccompanyingRow {
+	name: string;
+	dateOfBirth: string;
+	citizenship: string;
+}
+
+let error = '';
+let values: Record<string, string> = {
+	firstName: linkedBooking ? linkedBooking.fullName.split(' ')[0] ?? '' : '',
+	lastName: linkedBooking ? linkedBooking.fullName.split(' ').slice(1).join(' ') : '',
+	email: linkedBooking?.email ?? '',
+	phone: linkedBooking?.phone?.split(' ').slice(1).join(' ') ?? '',
+	phone_country: linkedBooking?.phone?.split(' ')[0] ?? '+372',
+	arrivalDate: linkedBooking?.checkIn ?? '',
+	departureDate: linkedBooking?.checkOut ?? '',
+};
+let accompanying: AccompanyingRow[] = [];
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	values = Object.fromEntries([...form.entries()].filter(([k]) => !k.startsWith('accompanying_')).map(([k, v]) => [k, String(v)]));
+
+	const firstName = String(form.get('firstName') || '').trim();
+	const lastName = String(form.get('lastName') || '').trim();
+	const dateOfBirth = String(form.get('dateOfBirth') || '').trim();
+	const citizenship = String(form.get('citizenship') || '').trim();
+	const country = String(form.get('country') || '').trim();
+	const city = String(form.get('city') || '').trim();
+	const street = String(form.get('street') || '').trim();
+	const zipCode = String(form.get('zipCode') || '').trim();
+	const phoneCountry = String(form.get('phone_country') || '');
+	const phoneNumber = String(form.get('phone') || '').trim();
+	const email = String(form.get('email') || '').trim().toLowerCase();
+	const arrivalDate = String(form.get('arrivalDate') || '').trim();
+	const departureDate = String(form.get('departureDate') || '').trim();
+	const consentAccepted = form.get('consent') === 'on';
+	const signatureDataUrl = String(form.get('signatureDataUrl') || '');
+
+	// Супроводжуючі особи — динамічний список accompanying_name_0/1/2...
+	const accNames = form.getAll('accompanying_name');
+	const accDobs = form.getAll('accompanying_dob');
+	const accCitizenships = form.getAll('accompanying_citizenship');
+	accompanying = accNames
+		.map((name, i) => ({ name: String(name).trim(), dateOfBirth: String(accDobs[i] || '').trim(), citizenship: String(accCitizenships[i] || '').trim() }))
+		.filter((a) => a.name);
+
+	const requiredOk =
+		firstName && lastName && dateOfBirth && citizenship && country && city && street && zipCode && phoneNumber && isValidEmail(email) && arrivalDate && departureDate;
+
+	if (!requiredOk) {
+		error = copy.page.errorGeneric;
+	} else if (!consentAccepted) {
+		error = copy.page.errorConsent;
+	} else if (!signatureDataUrl || signatureDataUrl.length < 100) {
+		error = copy.page.errorSignature;
+	} else {
+		const inserted = db
+			.insert(checkinCards)
+			.values({
+				bookingId: linkedBooking?.id ?? null,
+				firstName,
+				lastName,
+				dateOfBirth,
+				citizenship,
+				country,
+				city,
+				street,
+				zipCode,
+				phone: `${phoneCountry} ${phoneNumber}`,
+				email,
+				accompanying: accompanying.length ? JSON.stringify(accompanying) : null,
+				arrivalDate,
+				departureDate,
+				consentAccepted: true,
+				guestSignatureDataUrl: signatureDataUrl,
+				guestSignedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+			})
+			.run();
+		const cardId = Number(inserted.lastInsertRowid);
+
+		try {
+			const code = formatCheckinCode(cardId);
+			const html = renderEmailHtml({
+				heading: copy.confirmation.heading,
+				bodyHtml: `
+					<p>${copy.confirmation.subheading}</p>
+					<table role="presentation" cellpadding="0" cellspacing="0" style="margin:1rem 0;background:#f5f6f8;border-radius:8px;width:100%;">
+						<tr><td style="padding:0.9rem 1.1rem;">
+							<p style="margin:0 0 0.3rem;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;color:#5b6068;">${copy.page.heading}</p>
+							<p style="margin:0;font-size:1.15rem;font-weight:800;letter-spacing:0.02em;">${code}</p>
+						</td></tr>
+					</table>
+					<p style="margin:0 0 0.3rem;"><strong>${firstName} ${lastName}</strong></p>
+					<p style="margin:0;">${copy.page.arrivalDate}: ${arrivalDate} → ${copy.page.departureDate}: ${departureDate}</p>
+				`,
+				footerNote: copy.confirmation.emailSent,
+			});
+			await sendMail(email, `${copy.meta.title} — ${code}`, html);
+		} catch {
+			// SMTP може бути недоступний — картка все одно збережена.
+		}
+
+		return Astro.redirect(`/${locale}/checkin/confirmation/${cardId}`);
+	}
+}
+---
+
+<BaseLayout locale={locale} title={copy.meta.title} description={copy.meta.description} path="/checkin">
+	<SiteHeader locale={locale} />
+
+	<main class="checkin-page">
+		<div class="container">
+			<div class="checkin-card">
+				<h1>{copy.page.heading}</h1>
+				<p class="subtitle">{copy.page.subheading}</p>
+
+				{error && <p class="form-error">{error}</p>}
+
+				<form method="POST" class="checkin-form" id="checkin-form">
+					<h2 class="section-heading">{copy.page.sectionPersonal}</h2>
+					<div class="field-row">
+						<label>
+							{copy.page.firstName}
+							<input type="text" name="firstName" required value={values.firstName ?? ''} />
+						</label>
+						<label>
+							{copy.page.lastName}
+							<input type="text" name="lastName" required value={values.lastName ?? ''} />
+						</label>
+					</div>
+					<div class="field-row">
+						<label>
+							{copy.page.dateOfBirth}
+							<input type="date" name="dateOfBirth" required value={values.dateOfBirth ?? ''} />
+						</label>
+						<label>
+							{copy.page.citizenship}
+							<select name="citizenship" required>
+								<option value="">—</option>
+								{countries.map((c) => (
+									<option value={c.name} selected={values.citizenship === c.name}>
+										{c.name}
+									</option>
+								))}
+							</select>
+						</label>
+					</div>
+
+					<h2 class="section-heading">{copy.page.sectionAddress}</h2>
+					<div class="field-row">
+						<label>
+							{copy.page.country}
+							<select name="country" required>
+								<option value="">—</option>
+								{countries.map((c) => (
+									<option value={c.name} selected={values.country === c.name}>
+										{c.name}
+									</option>
+								))}
+							</select>
+						</label>
+						<label>
+							{copy.page.city}
+							<input type="text" name="city" required value={values.city ?? ''} />
+						</label>
+					</div>
+					<div class="field-row">
+						<label>
+							{copy.page.street}
+							<input type="text" name="street" required value={values.street ?? ''} />
+						</label>
+						<label>
+							{copy.page.zip}
+							<input type="text" name="zipCode" required value={values.zipCode ?? ''} />
+						</label>
+					</div>
+
+					<h2 class="section-heading">{copy.page.sectionContact}</h2>
+					<label>
+						{copy.page.phone}
+						<PhoneInput name="phone" required value={values.phone} countryValue={values.phone_country} />
+					</label>
+					<label>
+						{copy.page.email}
+						<input type="email" name="email" required value={values.email ?? ''} />
+					</label>
+
+					<h2 class="section-heading">{copy.page.sectionAccompanying}</h2>
+					<p class="field-note">{copy.page.accompanyingHint}</p>
+					<div id="accompanying-list"></div>
+					<button type="button" class="btn-add-row" id="add-accompanying-btn">{copy.page.addAccompanying}</button>
+
+					<h2 class="section-heading">{copy.page.sectionStay}</h2>
+					<div class="field-row">
+						<label>
+							{copy.page.arrivalDate}
+							<input type="date" name="arrivalDate" required value={values.arrivalDate ?? ''} />
+						</label>
+						<label>
+							{copy.page.departureDate}
+							<input type="date" name="departureDate" required value={values.departureDate ?? ''} />
+						</label>
+					</div>
+
+					<div class="consent-box">
+						<p>{copy.page.consentText}</p>
+						<label class="checkbox-row">
+							<input type="checkbox" name="consent" required />
+							<span>{copy.page.consentCheckbox}</span>
+						</label>
+					</div>
+
+					<div class="signature-section">
+						<p class="signature-label">{copy.page.signatureLabel}</p>
+						<canvas id="signature-canvas" class="signature-canvas" width="600" height="180"></canvas>
+						<div class="signature-actions">
+							<button type="button" id="signature-clear-btn" class="btn-clear">{copy.page.signatureClear}</button>
+							<span class="field-note">{copy.page.signatureHint}</span>
+						</div>
+						<input type="hidden" name="signatureDataUrl" id="signature-data-url" />
+					</div>
+
+					<button type="submit" class="btn btn--primary-dark" id="submit-btn">{copy.page.submitBtn}</button>
+				</form>
+			</div>
+		</div>
+	</main>
+
+	<SiteFooter locale={locale} />
+
+	<template id="accompanying-row-template">
+		<div class="accompanying-row">
+			<input type="text" name="accompanying_name" placeholder={copy.page.accompanyingName} />
+			<input type="date" name="accompanying_dob" placeholder={copy.page.accompanyingDob} />
+			<input type="text" name="accompanying_citizenship" placeholder={copy.page.accompanyingCitizenship} />
+			<button type="button" class="btn-remove-row" data-remove-row>{copy.page.removeAccompanying}</button>
+		</div>
+	</template>
+
+	<script is:inline>
+		(function () {
+			const list = document.getElementById('accompanying-list');
+			const tmpl = document.getElementById('accompanying-row-template');
+			const addBtn = document.getElementById('add-accompanying-btn');
+
+			addBtn?.addEventListener('click', () => {
+				const clone = tmpl.content.cloneNode(true);
+				list.appendChild(clone);
+			});
+
+			list?.addEventListener('click', (e) => {
+				const btn = e.target.closest('[data-remove-row]');
+				if (!btn) return;
+				btn.closest('.accompanying-row')?.remove();
+			});
+
+			// Підпис — canvas, pointer events (працює і мишкою, і пальцем).
+			const canvas = document.getElementById('signature-canvas');
+			const ctx = canvas?.getContext('2d');
+			const clearBtn = document.getElementById('signature-clear-btn');
+			const hiddenInput = document.getElementById('signature-data-url');
+			let drawing = false;
+			let hasDrawn = false;
+
+			function pos(e) {
+				const rect = canvas.getBoundingClientRect();
+				const scaleX = canvas.width / rect.width;
+				const scaleY = canvas.height / rect.height;
+				return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+			}
+
+			if (ctx) {
+				ctx.strokeStyle = '#14161a';
+				ctx.lineWidth = 2.5;
+				ctx.lineCap = 'round';
+				ctx.lineJoin = 'round';
+			}
+
+			canvas?.addEventListener('pointerdown', (e) => {
+				drawing = true;
+				hasDrawn = true;
+				const p = pos(e);
+				ctx.beginPath();
+				ctx.moveTo(p.x, p.y);
+				canvas.setPointerCapture(e.pointerId);
+			});
+			canvas?.addEventListener('pointermove', (e) => {
+				if (!drawing) return;
+				const p = pos(e);
+				ctx.lineTo(p.x, p.y);
+				ctx.stroke();
+			});
+			canvas?.addEventListener('pointerup', () => (drawing = false));
+			canvas?.addEventListener('pointerleave', () => (drawing = false));
+
+			clearBtn?.addEventListener('click', () => {
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+				hasDrawn = false;
+			});
+
+			document.getElementById('checkin-form')?.addEventListener('submit', () => {
+				hiddenInput.value = hasDrawn ? canvas.toDataURL('image/png') : '';
+			});
+		})();
+	</script>
+
+	<style>
+		.checkin-page {
+			background: var(--bg-light);
+			min-height: 70vh;
+			padding: 2.5rem 0 4rem;
+		}
+
+		.container {
+			max-width: 40rem;
+			margin: 0 auto;
+			padding: 0 1.25rem;
+		}
+
+		.checkin-card {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 1rem;
+			padding: 1.75rem;
+		}
+
+		h1 {
+			margin: 0 0 0.3rem;
+			font-size: clamp(1.4rem, 4vw, 1.8rem);
+			font-weight: 800;
+		}
+
+		.subtitle {
+			margin: 0 0 1.5rem;
+			color: var(--text-dark-muted);
+			font-size: 0.9rem;
+		}
+
+		.form-error {
+			background: rgba(234, 67, 53, 0.1);
+			color: #c0392b;
+			border: 1px solid rgba(234, 67, 53, 0.3);
+			border-radius: 0.6rem;
+			padding: 0.75rem 1rem;
+			margin-bottom: 1.25rem;
+			font-size: 0.9rem;
+		}
+
+		.checkin-form {
+			display: flex;
+			flex-direction: column;
+			gap: 1rem;
+		}
+
+		.checkin-form label {
+			display: flex;
+			flex-direction: column;
+			gap: 0.35rem;
+			font-size: 0.85rem;
+			font-weight: 600;
+			color: var(--text-dark);
+		}
+
+		.checkin-form input[type='text'],
+		.checkin-form input[type='email'],
+		.checkin-form input[type='date'],
+		.checkin-form select {
+			font: inherit;
+			font-weight: 400;
+			padding: 0.6rem 0.75rem;
+			border-radius: 0.5rem;
+			border: 1px solid var(--border-light);
+			background: #fff;
+			color: var(--text-dark);
+		}
+
+		.field-row {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 1rem;
+		}
+
+		.section-heading {
+			margin: 0.4rem 0 -0.3rem;
+			font-size: 1rem;
+			font-weight: 700;
+		}
+
+		.field-note {
+			margin: 0;
+			font-size: 0.78rem;
+			font-weight: 400;
+			color: var(--text-dark-muted);
+		}
+
+		.accompanying-row {
+			display: grid;
+			grid-template-columns: 1.4fr 1fr 1fr auto;
+			gap: 0.5rem;
+			margin-bottom: 0.5rem;
+		}
+
+		.accompanying-row input {
+			font: inherit;
+			font-size: 0.85rem;
+			padding: 0.5rem 0.6rem;
+			border-radius: 0.5rem;
+			border: 1px solid var(--border-light);
+		}
+
+		.btn-add-row,
+		.btn-remove-row,
+		.btn-clear {
+			font: inherit;
+			font-size: 0.8rem;
+			font-weight: 700;
+			padding: 0.45rem 0.8rem;
+			border-radius: 0.5rem;
+			border: 1px solid var(--border-light);
+			background: #fff;
+			cursor: pointer;
+			color: var(--text-dark);
+			align-self: flex-start;
+		}
+
+		.btn-remove-row {
+			color: #c0392b;
+		}
+
+		.consent-box {
+			background: var(--bg-light);
+			border-radius: 0.7rem;
+			padding: 1rem;
+			font-size: 0.82rem;
+			color: var(--text-dark-muted);
+		}
+
+		.consent-box p {
+			margin: 0 0 0.7rem;
+		}
+
+		.checkbox-row {
+			flex-direction: row;
+			align-items: flex-start;
+			gap: 0.5rem;
+			font-weight: 600 !important;
+			color: var(--text-dark) !important;
+		}
+
+		.signature-section {
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+		}
+
+		.signature-label {
+			margin: 0;
+			font-size: 0.85rem;
+			font-weight: 600;
+		}
+
+		.signature-canvas {
+			width: 100%;
+			height: 11rem;
+			border: 1px dashed var(--border-light);
+			border-radius: 0.7rem;
+			background: #fdfdfc;
+			touch-action: none;
+			cursor: crosshair;
+		}
+
+		.signature-actions {
+			display: flex;
+			align-items: center;
+			gap: 0.75rem;
+		}
+
+		.btn {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			padding: 0.8rem 1.4rem;
+			border-radius: 0.6rem;
+			font-weight: 700;
+			font-size: 0.92rem;
+			border: none;
+			cursor: pointer;
+			text-decoration: none;
+		}
+
+		.btn--primary-dark {
+			background: var(--text-dark);
+			color: var(--bg-light);
+			margin-top: 0.4rem;
+		}
+
+		.btn--primary-dark:hover {
+			filter: brightness(1.2);
+		}
+
+		@media (max-width: 560px) {
+			.field-row,
+			.accompanying-row {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+</BaseLayout>

@@ -11,7 +11,7 @@ import { adminLocales, getAdminLocale, admin } from '../i18n/admin';
 interface Props {
 	title: string;
 	adminName?: string;
-	activeNav?: 'overview' | 'guests' | 'rooms' | 'bookings';
+	activeNav?: 'overview' | 'guests' | 'rooms' | 'bookings' | 'checkin';
 }
 
 const { title, adminName, activeNav } = Astro.props;
@@ -278,6 +278,15 @@ const returnTo = encodeURIComponent(Astro.url.pathname + Astro.url.search);
 									></path><path d="M8 14l2.5 2.5L16 11"></path></svg
 								>
 								{copy.bookings}
+							</a>
+						</li>
+						<li>
+							<a href="/admin/checkin" class={activeNav === 'checkin' ? 'is-active' : ''}>
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+									><path d="M14 3v4a1 1 0 001 1h4"></path><path d="M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"></path><path
+										d="M9 15l2 2 4-4"></path></svg
+								>
+								{copy.checkin}
 							</a>
 						</li>
 						<li>

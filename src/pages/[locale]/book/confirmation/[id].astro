@@ -12,6 +12,7 @@ import { db } from '../../../../db/client';
 import { bookings, rooms } from '../../../../db/schema';
 import { eq } from 'drizzle-orm';
 import { isRevolutConfigured } from '../../../../lib/revolut';
+import { formatBookingRef } from '../../../../lib/memberCard';
 import { currency } from '../../../../data/pricing';
 
 export const prerender = false;
@@ -66,7 +67,7 @@ const revolutReady = isRevolutConfigured() && Boolean(bk.paymentRef) && Boolean(
 				<p class="subtitle">{copy.subheading}</p>
 
 				<dl class="details">
-					<div><dt>{copy.refLabel}</dt><dd>#{bk.id}</dd></div>
+					<div><dt>{copy.refLabel}</dt><dd>{formatBookingRef(bk.id)}</dd></div>
 					<div><dt>{bookingCopy[locale].page.roomLabel}</dt><dd>{roomTitle}</dd></div>
 					<div><dt>{bookingCopy[locale].page.checkIn}</dt><dd>{bk.checkIn}</dd></div>
 					<div><dt>{bookingCopy[locale].page.checkOut}</dt><dd>{bk.checkOut}</dd></div>

@@ -13,6 +13,17 @@ export function formatMemberId(id: number): string {
 	return `HHA-${String(id).padStart(6, '0')}`;
 }
 
+// Той самий формат для інших довідкових кодів у email/UI (бронювання,
+// картка гостя) — щоб гість міг продиктувати короткий код замість
+// голого числового id.
+export function formatBookingRef(id: number): string {
+	return `BK-${String(id).padStart(6, '0')}`;
+}
+
+export function formatCheckinCode(id: number): string {
+	return `CH-${String(id).padStart(6, '0')}`;
+}
+
 export function memberVerifyUrl(site: string | URL, locale: string, memberId: string): string {
 	return new URL(`${locale}/account/id/${memberId}`, site).toString();
 }
