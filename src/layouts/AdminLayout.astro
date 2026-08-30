@@ -111,13 +111,21 @@ const returnTo = encodeURIComponent(Astro.url.pathname + Astro.url.search);
 			}
 
 			.admin-nav a {
-				display: block;
+				display: flex;
+				align-items: center;
+				gap: 0.65rem;
 				padding: 0.55rem 0.7rem;
 				border-radius: 0.5rem;
 				text-decoration: none;
 				color: var(--cream-muted);
 				font-size: 0.88rem;
 				font-weight: 500;
+			}
+
+			.admin-nav a svg {
+				width: 17px;
+				height: 17px;
+				flex-shrink: 0;
 			}
 
 			.admin-nav a:hover,
@@ -167,6 +175,9 @@ const returnTo = encodeURIComponent(Astro.url.pathname + Astro.url.search);
 
 			.admin-logout-btn {
 				width: 100%;
+				display: flex;
+				align-items: center;
+				gap: 0.65rem;
 				text-align: left;
 				background: none;
 				border: none;
@@ -177,6 +188,12 @@ const returnTo = encodeURIComponent(Astro.url.pathname + Astro.url.search);
 				padding: 0.55rem 0.7rem;
 				border-radius: 0.5rem;
 				cursor: pointer;
+			}
+
+			.admin-logout-btn svg {
+				width: 17px;
+				height: 17px;
+				flex-shrink: 0;
 			}
 
 			.admin-logout-btn:hover {
@@ -232,9 +249,36 @@ const returnTo = encodeURIComponent(Astro.url.pathname + Astro.url.search);
 				<p class="admin-brand-sub">{copy.brandSub}</p>
 				<nav>
 					<ul class="admin-nav">
-						<li><a href="/admin" class={activeNav === 'overview' ? 'is-active' : ''}>{copy.overview}</a></li>
-						<li><a href="/admin/rooms" class={activeNav === 'rooms' ? 'is-active' : ''}>{copy.rooms}</a></li>
-						<li><a href="/admin/guests" class={activeNav === 'guests' ? 'is-active' : ''}>{copy.guests}</a></li>
+						<li>
+							<a href="/admin" class={activeNav === 'overview' ? 'is-active' : ''}>
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+									><rect x="3" y="3" width="7" height="9" rx="1.5"></rect><rect x="14" y="3" width="7" height="5" rx="1.5"></rect><rect
+										x="14"
+										y="12"
+										width="7"
+										height="9"
+										rx="1.5"></rect><rect x="3" y="16" width="7" height="5" rx="1.5"></rect></svg
+								>
+								{copy.overview}
+							</a>
+						</li>
+						<li>
+							<a href="/admin/rooms" class={activeNav === 'rooms' ? 'is-active' : ''}>
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+									><path d="M3 19V7a2 2 0 012-2h4a2 2 0 012 2v12"></path><path d="M13 19v-6a2 2 0 012-2h4a2 2 0 012 2v6"></path><path
+										d="M3 19h18"></path><path d="M3 12h8"></path></svg
+								>
+								{copy.rooms}
+							</a>
+						</li>
+						<li>
+							<a href="/admin/guests" class={activeNav === 'guests' ? 'is-active' : ''}>
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+									><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"></path></svg
+								>
+								{copy.guests}
+							</a>
+						</li>
 					</ul>
 				</nav>
 				<div class="admin-sidebar-foot">
@@ -247,7 +291,12 @@ const returnTo = encodeURIComponent(Astro.url.pathname + Astro.url.search);
 						))}
 					</div>
 					<form method="POST" action="/admin/logout">
-						<button type="submit" class="admin-logout-btn">{copy.logout}</button>
+						<button type="submit" class="admin-logout-btn">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+								><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg
+							>
+							{copy.logout}
+						</button>
 					</form>
 				</div>
 			</aside>
