@@ -80,7 +80,7 @@ const revolutReady = isRevolutConfigured() && Boolean(bk.paymentRef) && Boolean(
 				{
 					needsPayment && revolutReady ? (
 						<div class="pay-box">
-							<a href={bk.paymentCheckoutUrl!} target="_blank" rel="noopener noreferrer" id="revolut-pay-btn" class="btn btn--primary-dark">
+							<a href={bk.paymentCheckoutUrl!} id="revolut-pay-btn" class="btn btn--primary-dark">
 								{bookingCopy[locale].page.paymentRevolut}
 							</a>
 							<button type="button" id="revolut-check-btn" class="btn btn--ghost-dark">
