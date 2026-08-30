@@ -652,14 +652,17 @@ const schema = {
 									{nearbyC.categories[key]}
 								</h3>
 								<ul>
-									{places.map((p) => (
+									{places.map((p) => {
+										const displayName = locale === 'et' && p.nameEt ? p.nameEt : p.name;
+										return (
 										<li>
-											<a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name + ', Estonia')}`} target="_blank" rel="noopener noreferrer">
-												{p.name}
+											<a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(displayName + ', Estonia')}`} target="_blank" rel="noopener noreferrer">
+												{displayName}
 											</a>
 											<span class="nearby-col__km">{p.km} km</span>
 										</li>
-									))}
+										);
+									})}
 								</ul>
 							</div>
 						))
