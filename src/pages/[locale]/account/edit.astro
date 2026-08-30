@@ -14,6 +14,7 @@ import { countries } from '../../../data/countries';
 import { db } from '../../../db/client';
 import { guests } from '../../../db/schema';
 import { isValidEmail } from '../../../lib/auth';
+import { isGoogleOAuthConfigured } from '../../../lib/oauth';
 import { eq, and, ne } from 'drizzle-orm';
 
 const rawLocale = Astro.params.locale;
@@ -23,6 +24,11 @@ if (!rawLocale || !isLocale(rawLocale)) {
 const locale: Locale = rawLocale;
 const copy = account[locale].editProfile;
 const regCopy = account[locale].register;
+const googleReady = isGoogleOAuthConfigured();
+
+const linkedNotice = Astro.url.searchParams.get('linked') === 'google';
+const unlinkedNotice = Astro.url.searchParams.get('unlinked') === 'google';
+const oauthErrorParam = Astro.url.searchParams.get('oauthError');
 
 const guestId = await Astro.session?.get('guestId');
 if (!guestId) {
@@ -34,8 +40,15 @@ if (!guest) {
 	return Astro.redirect(`/${locale}/account/login`);
 }
 
+const initials = guest.fullName
+	.split(/\s+/)
+	.filter(Boolean)
+	.slice(0, 2)
+	.map((p) => p[0]!.toUpperCase())
+	.join('');
+
 let error = '';
-let success = false;
+const updatedNotice = Astro.url.searchParams.get('updated') === '1';
 
 // Значення полів форми — з guest за замовчуванням, перебиваються values
 // POST-даними, якщо була спроба сабміту з помилкою (щоб не втрачати те,
@@ -83,6 +96,18 @@ if (Astro.request.method === 'POST') {
 		if (existing) {
 			error = copy.errorEmailTaken;
 		} else {
+			// avatarUrl — прихований інпут, який заповнює клієнтський JS
+			// (canvas-ресайз завантаженого файлу в data URL). Порожній рядок =
+			// гість нічого не міняв — лишаємо старе фото, не затираємо.
+			// removeAvatar='on' — явне прибирання фото окремою кнопкою.
+			const submittedAvatar = String(form.get('avatarUrl') || '');
+			const removeAvatar = form.get('removeAvatar') === 'on';
+			const avatarUpdate = removeAvatar
+				? { avatarUrl: null, avatarSource: null }
+				: submittedAvatar
+					? { avatarUrl: submittedAvatar, avatarSource: 'upload' }
+					: {};
+
 			db.update(guests)
 				.set({
 					fullName,
@@ -100,11 +125,15 @@ if (Astro.request.method === 'POST') {
 					postalCode: String(form.get('postalCode') || '') || null,
 					countryOfResidence: String(form.get('countryOfResidence') || '') || null,
 					marketingConsent: form.get('marketingConsent') === 'on',
+					...avatarUpdate,
 				})
 				.where(eq(guests.id, guestId))
 				.run();
 
-			success = true;
+			// Post/Redirect/Get — уникає застарілого guest (закритого над
+			// insert/update) у тому ж рендері й повторного сабміту форми на
+			// F5 після успіху.
+			return Astro.redirect(`/${locale}/account/edit?updated=1`);
 		}
 	}
 }
@@ -123,10 +152,71 @@ if (Astro.request.method === 'POST') {
 			<h1>{copy.title}</h1>
 			<p class="subtitle">{copy.subtitle}</p>
 
-			{success && <p class="form-success">{copy.successMessage}</p>}
+			{updatedNotice && <p class="form-success">{copy.successMessage}</p>}
+			{linkedNotice && <p class="form-success">{copy.linkedSuccess}</p>}
+			{unlinkedNotice && <p class="form-success">{copy.unlinkedSuccess}</p>}
 			{error && <p class="form-error">{error}</p>}
+			{oauthErrorParam === 'taken' && <p class="form-error">{copy.oauthErrorTaken}</p>}
+			{oauthErrorParam === '1' && <p class="form-error">{copy.oauthErrorGeneric}</p>}
+
+			<div class="photo-section">
+				<div class="photo-preview" id="photo-preview">
+					{guest.avatarUrl ? <img src={guest.avatarUrl} alt="" id="photo-preview-img" /> : <span id="photo-preview-initials">{initials}</span>}
+				</div>
+				<div class="photo-actions">
+					<p class="photo-title">{copy.photoTitle}</p>
+					<div class="photo-buttons">
+						<label class="btn btn--ghost-small">
+							{copy.photoUpload}
+							<input type="file" id="photo-input" accept="image/*" hidden />
+						</label>
+						{guest.avatarUrl && (
+							<button type="submit" form="edit-form" name="removeAvatar" value="on" class="btn btn--ghost-small btn--danger-text">
+								{copy.photoRemove}
+							</button>
+						)}
+					</div>
+				</div>
+			</div>
+
+			<div class="connected-section">
+				<p class="connected-title">{copy.connectedTitle}</p>
+				<div class="connected-row">
+					<span class="connected-provider">
+						<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+							<path fill="#4285F4" d="M23.52 12.27c0-.82-.07-1.6-.2-2.36H12v4.47h6.47c-.28 1.5-1.13 2.78-2.4 3.63v3.02h3.88c2.27-2.09 3.57-5.17 3.57-8.76z" />
+							<path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.88-3.02c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.11C3.24 21.3 7.29 24 12 24z" />
+							<path fill="#FBBC05" d="M5.27 14.27c-.25-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27V6.62H1.26A11.97 11.97 0 0 0 0 12c0 1.93.46 3.76 1.26 5.38l4.01-3.11z" />
+							<path fill="#EA4335" d="M12 4.77c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.29 0 3.24 2.7 1.26 6.62l4.01 3.11C6.22 6.88 8.87 4.77 12 4.77z" />
+						</svg>
+						Google
+						{guest.googleId && <span class="connected-badge">{copy.googleConnected}</span>}
+					</span>
+					{guest.googleId ? (
+						<form method="POST" action="/api/oauth/google/disconnect">
+							<input type="hidden" name="locale" value={locale} />
+							<button type="submit" class="btn btn--ghost-small">{copy.disconnectGoogle}</button>
+						</form>
+					) : googleReady ? (
+						<a class="btn btn--ghost-small" href={`/api/oauth/google/start?locale=${locale}`}>{copy.connectGoogle}</a>
+					) : (
+						<button type="button" class="btn btn--ghost-small" disabled title="Coming soon">{copy.connectGoogle}</button>
+					)}
+				</div>
+				<div class="connected-row">
+					<span class="connected-provider">
+						<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+							<circle cx="12" cy="12" r="12" fill="#26A5E4" />
+							<path fill="#fff" d="M5.4 12.1l12-4.6c.6-.2 1.1.3.9 1l-2 9.3c-.1.5-.7.7-1.1.4l-3.1-2.3-1.5 1.4c-.2.2-.4.2-.6.1l.3-2.7 5.5-5-6.9 4.3-2.8-.9c-.6-.2-.6-.6.3-1z" />
+						</svg>
+						Telegram
+					</span>
+					<button type="button" class="btn btn--ghost-small" disabled title="Coming soon">{copy.connectTelegram}</button>
+				</div>
+			</div>
 
 			<form method="POST" class="account-form" id="edit-form">
+				<input type="hidden" name="avatarUrl" id="avatar-url-field" value="" />
 				<div class="account-type-toggle">
 					<label>
 						<input type="radio" name="accountType" value="individual" checked={values.accountType !== 'company'} />
@@ -240,6 +330,48 @@ if (Astro.request.method === 'POST') {
 			});
 			sync();
 		})();
+
+		// Фото профілю — ресайз на клієнті через canvas (макс 200x200,
+		// cover-crop по центру, JPEG q=0.82), щоб не ганяти й не зберігати
+		// мегабайтні оригінали (немає окремого файлового сховища на цьому
+		// хостингу — фото йде в БД як data URL, див. коментар в db/schema.ts).
+		(function () {
+			var input = document.getElementById('photo-input');
+			var hiddenField = document.getElementById('avatar-url-field');
+			var preview = document.getElementById('photo-preview');
+			if (!input || !hiddenField || !preview) return;
+
+			input.addEventListener('change', function () {
+				var file = input.files && input.files[0];
+				if (!file) return;
+
+				var img = new Image();
+				var reader = new FileReader();
+				reader.onload = function (e) {
+					img.onload = function () {
+						var size = 200;
+						var canvas = document.createElement('canvas');
+						canvas.width = size;
+						canvas.height = size;
+						var ctx = canvas.getContext('2d');
+						var scale = Math.max(size / img.width, size / img.height);
+						var w = img.width * scale;
+						var h = img.height * scale;
+						ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+						var dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+						hiddenField.value = dataUrl;
+
+						preview.innerHTML = '';
+						var previewImg = document.createElement('img');
+						previewImg.src = dataUrl;
+						previewImg.alt = '';
+						preview.appendChild(previewImg);
+					};
+					img.src = String(e.target && e.target.result);
+				};
+				reader.readAsDataURL(file);
+			});
+		})();
 	</script>
 
 	<style>
@@ -335,6 +467,128 @@ if (Astro.request.method === 'POST') {
 			padding: 0.75rem 1rem;
 			margin-bottom: 1.25rem;
 			font-size: 0.9rem;
+		}
+
+		.photo-section {
+			display: flex;
+			align-items: center;
+			gap: 1rem;
+			padding: 1rem;
+			border: 1px solid var(--border-light);
+			border-radius: 0.7rem;
+			margin-bottom: 1.1rem;
+		}
+
+		.photo-preview {
+			width: 3.5rem;
+			height: 3.5rem;
+			border-radius: 50%;
+			overflow: hidden;
+			flex-shrink: 0;
+			background: var(--accent);
+			color: var(--accent-ink);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-family: var(--font-display);
+			font-weight: 600;
+			font-size: 1.1rem;
+		}
+
+		.photo-preview img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+		}
+
+		.photo-actions {
+			flex: 1;
+			min-width: 0;
+		}
+
+		.photo-title {
+			margin: 0 0 0.4rem;
+			font-size: 0.82rem;
+			font-weight: 600;
+			color: var(--text-dark);
+		}
+
+		.photo-buttons {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.5rem;
+		}
+
+		.btn--ghost-small {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.35rem;
+			height: 2.1rem;
+			padding: 0 0.8rem;
+			border-radius: 0.5rem;
+			border: 1px solid var(--border-light);
+			background: #fff;
+			color: var(--text-dark);
+			font-size: 0.78rem;
+			font-weight: 600;
+			text-decoration: none;
+			cursor: pointer;
+		}
+
+		.btn--ghost-small:hover {
+			border-color: var(--accent);
+			color: var(--accent);
+		}
+
+		.btn--ghost-small[disabled] {
+			cursor: not-allowed;
+			opacity: 0.55;
+		}
+
+		.btn--danger-text {
+			color: #b3432f;
+		}
+
+		.connected-section {
+			padding: 1rem;
+			border: 1px solid var(--border-light);
+			border-radius: 0.7rem;
+			margin-bottom: 1.25rem;
+			display: flex;
+			flex-direction: column;
+			gap: 0.7rem;
+		}
+
+		.connected-title {
+			margin: 0;
+			font-size: 0.82rem;
+			font-weight: 600;
+			color: var(--text-dark);
+		}
+
+		.connected-row {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.75rem;
+		}
+
+		.connected-provider {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			font-size: 0.85rem;
+			font-weight: 600;
+			color: var(--text-dark);
+		}
+
+		.connected-badge {
+			font-size: 0.7rem;
+			font-weight: 600;
+			color: #3f7a4f;
+			background: rgba(63, 122, 79, 0.1);
+			border-radius: 999px;
+			padding: 0.15rem 0.55rem;
 		}
 
 		.account-form {

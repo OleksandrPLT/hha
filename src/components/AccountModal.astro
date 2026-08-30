@@ -42,7 +42,7 @@ const d = copy.dashboard;
 
 		<div class="account-modal__brand">
 			<div class="am-who">
-				<div class="am-avatar" data-field="initials">··</div>
+				<div class="am-avatar" id="am-avatar" data-field="initials">··</div>
 				<div>
 					<p class="am-name" data-field="fullName">···</p>
 					<p class="am-since">
@@ -231,6 +231,10 @@ const d = copy.dashboard;
 				.then(function (data) {
 					loaded = true;
 					setText('initials', data.initials);
+					if (data.avatarUrl) {
+						var avatarEl = document.getElementById('am-avatar');
+						if (avatarEl) avatarEl.innerHTML = '<img src="' + data.avatarUrl + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+					}
 					setText('fullName', data.fullName);
 					setText('memberSince', data.memberSince);
 					setText('loyaltyPoints', data.loyaltyPoints);

@@ -156,7 +156,9 @@ const qrSvg = await generateMemberQrSvg(verifyUrl);
 
 			<div class="dash-main">
 				<div class="dash-head">
-					<div class="dash-head__avatar" aria-hidden="true">{initials}</div>
+					<div class="dash-head__avatar" aria-hidden="true">
+					{guest.avatarUrl ? <img src={guest.avatarUrl} alt="" /> : initials}
+				</div>
 					<div>
 						<h1>{copy.dashboard.welcome}, {guest.fullName}</h1>
 						{memberSinceLabel && <p>{copy.dashboard.memberSince} {memberSinceLabel}</p>}
@@ -488,6 +490,13 @@ const qrSvg = await generateMemberQrSvg(verifyUrl);
 			align-items: center;
 			justify-content: center;
 			flex-shrink: 0;
+			overflow: hidden;
+		}
+
+		.dash-head__avatar img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
 		}
 
 		.dash-head h1 {

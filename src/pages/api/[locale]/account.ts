@@ -57,6 +57,7 @@ export const GET: APIRoute = async ({ params, session, site, url }) => {
 		JSON.stringify({
 			fullName: guest.fullName,
 			initials,
+			avatarUrl: guest.avatarUrl,
 			memberId,
 			qrSvg,
 			email: guest.email,

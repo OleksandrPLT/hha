@@ -11,8 +11,9 @@ import { account } from '../../../i18n/account';
 import { countries } from '../../../data/countries';
 import { db } from '../../../db/client';
 import { guests } from '../../../db/schema';
-import { hashPassword, isValidEmail } from '../../../lib/auth';
+import { hashPassword, isValidEmail, generateResetToken } from '../../../lib/auth';
 import { formatMemberId } from '../../../lib/memberCard';
+import { isGoogleOAuthConfigured, fetchAndEncodeAvatar } from '../../../lib/oauth';
 import { eq } from 'drizzle-orm';
 
 const rawLocale = Astro.params.locale;
@@ -21,9 +22,20 @@ if (!rawLocale || !isLocale(rawLocale)) {
 }
 const locale: Locale = rawLocale;
 const copy = account[locale].register;
+const googleReady = isGoogleOAuthConfigured();
+
+// Продовження реєстрації після Google OAuth (callback.ts кладе профіль у
+// сесію, коли це геть новий гість — Google не дає телефон і не заміняє
+// нашу обов'язкову згоду на обробку даних, тож анкету все одно треба
+// заповнити, лише без пароля).
+const pendingGoogle = (await Astro.session?.get('pendingGoogle')) as { sub: string; email: string; name: string; picture: string } | undefined;
+// Достатньо самого факту наявності pendingGoogle в сесії (не query-рядка
+// ?google=1) — так branching працює однаково і на GET, і на POST,
+// незалежно від того, чи форма зберігає query string при сабміті.
+const googleMode = Boolean(pendingGoogle);
 
 let error = '';
-let values: Record<string, string> = {};
+let values: Record<string, string> = googleMode && pendingGoogle ? { fullName: pendingGoogle.name, email: pendingGoogle.email } : {};
 
 if (Astro.request.method === 'POST') {
 	const form = await Astro.request.formData();
@@ -31,7 +43,7 @@ if (Astro.request.method === 'POST') {
 
 	const isCompany = form.get('accountType') === 'company';
 	const fullName = String(form.get('fullName') || '').trim();
-	const email = String(form.get('email') || '')
+	const email = (googleMode && pendingGoogle ? pendingGoogle.email : String(form.get('email') || ''))
 		.trim()
 		.toLowerCase();
 	const phoneCountry = String(form.get('phone_country') || '');
@@ -41,10 +53,10 @@ if (Astro.request.method === 'POST') {
 
 	const dataProcessingConsent = form.get('dataProcessingConsent') === 'on';
 
-	if (!fullName || !isValidEmail(email) || !phoneNumber || !password) {
-		error = copy.errorGeneric;
-	} else if (password !== confirmPassword) {
-		error = copy.errorPasswordMismatch;
+	const passwordOk = googleMode || (password.length > 0 && password === confirmPassword);
+
+	if (!fullName || !isValidEmail(email) || !phoneNumber || !passwordOk) {
+		error = !passwordOk && !googleMode && password !== confirmPassword ? copy.errorPasswordMismatch : copy.errorGeneric;
 	} else if (!dataProcessingConsent) {
 		error = copy.errorConsentRequired;
 	} else {
@@ -52,7 +64,12 @@ if (Astro.request.method === 'POST') {
 		if (existing) {
 			error = copy.errorEmailTaken;
 		} else {
-			const passwordHash = await hashPassword(password);
+			// Google-гість не задає пароль — генеруємо випадковий, невідомий
+			// йому самому (bcrypt-хеш все одно потрібен, поле NOT NULL). Якщо
+			// колись захоче логінитись паролем — forgot-password це вирішує.
+			const passwordHash = await hashPassword(googleMode ? generateResetToken() : password);
+			const avatarUrl = googleMode && pendingGoogle?.picture ? await fetchAndEncodeAvatar(pendingGoogle.picture) : null;
+
 			const inserted = db
 				.insert(guests)
 				.values({
@@ -74,9 +91,13 @@ if (Astro.request.method === 'POST') {
 					marketingConsent: form.get('marketingConsent') === 'on',
 					dataProcessingConsent: true,
 					dataProcessingConsentAt: new Date().toISOString(),
+					googleId: googleMode ? pendingGoogle?.sub : null,
+					avatarUrl: avatarUrl,
+					avatarSource: avatarUrl ? 'google' : null,
 				})
 				.run();
 
+			if (googleMode) await Astro.session?.set('pendingGoogle', undefined);
 			await Astro.session?.set('guestId', Number(inserted.lastInsertRowid));
 			Astro.cookies.set('hha_signed_in', '1', { path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 30 });
 			return Astro.redirect(`/${locale}/account/${formatMemberId(Number(inserted.lastInsertRowid))}`);
@@ -98,26 +119,58 @@ if (Astro.request.method === 'POST') {
 			<h1>{copy.title}</h1>
 			<p class="subtitle">{copy.subtitle}</p>
 
-			<div class="oauth-buttons">
-				<button type="button" class="oauth-btn" disabled title="Coming soon">
-					<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-						<path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" />
-						<path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" />
-						<path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" />
-						<path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" />
-					</svg>
-					Google
-				</button>
-				<button type="button" class="oauth-btn" disabled title="Coming soon">
-					<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-						<circle cx="12" cy="12" r="12" fill="#26A5E4" />
-						<path fill="#fff" d="M5.4 12.1l12-4.6c.6-.2 1.1.3.9 1l-2 9.3c-.1.5-.7.7-1.1.4l-3.1-2.3-1.5 1.4c-.2.2-.4.2-.6.1l.3-2.7 5.5-5-6.9 4.3-2.8-.9c-.6-.2-.6-.6.3-1z" />
-					</svg>
-					Telegram
-				</button>
-			</div>
-			<p class="oauth-note">Coming soon</p>
-			<div class="or-divider"><span>—</span></div>
+			{
+				!googleMode && (
+					<Fragment>
+						<div class="oauth-buttons">
+							{googleReady ? (
+								<a class="oauth-btn" href={`/api/oauth/google/start?locale=${locale}`}>
+									<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+										<path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" />
+										<path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" />
+										<path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" />
+										<path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" />
+									</svg>
+									Google
+								</a>
+							) : (
+								<button type="button" class="oauth-btn" disabled title="Coming soon">
+									<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+										<path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" />
+										<path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" />
+										<path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" />
+										<path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" />
+									</svg>
+									Google
+								</button>
+							)}
+							<button type="button" class="oauth-btn" disabled title="Coming soon">
+								<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+									<circle cx="12" cy="12" r="12" fill="#26A5E4" />
+									<path fill="#fff" d="M5.4 12.1l12-4.6c.6-.2 1.1.3.9 1l-2 9.3c-.1.5-.7.7-1.1.4l-3.1-2.3-1.5 1.4c-.2.2-.4.2-.6.1l.3-2.7 5.5-5-6.9 4.3-2.8-.9c-.6-.2-.6-.6.3-1z" />
+								</svg>
+								Telegram
+							</button>
+						</div>
+						<p class="oauth-note">Telegram — Coming soon</p>
+						<div class="or-divider"><span>—</span></div>
+					</Fragment>
+				)
+			}
+
+			{
+				googleMode && pendingGoogle && (
+					<p class="google-mode-note">
+						<svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true">
+							<path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" />
+							<path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" />
+							<path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" />
+							<path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" />
+						</svg>
+						Continuing as {pendingGoogle.email} — just a few more details.
+					</p>
+				)
+			}
 
 			{error && <p class="form-error">{error}</p>}
 
@@ -160,7 +213,7 @@ if (Astro.request.method === 'POST') {
 
 				<label>
 					{copy.email}
-					<input type="email" name="email" required value={values.email ?? ''} />
+					<input type="email" name="email" required readonly={googleMode} value={values.email ?? ''} />
 				</label>
 
 				<label>
@@ -168,16 +221,20 @@ if (Astro.request.method === 'POST') {
 					<PhoneInput name="phone" required value={values.phone} countryValue={values.phone_country} />
 				</label>
 
-				<div class="field-row">
-					<label>
-						{copy.password}
-						<input type="password" name="password" required minlength="8" />
-					</label>
-					<label>
-						{copy.confirmPassword}
-						<input type="password" name="confirmPassword" required minlength="8" />
-					</label>
-				</div>
+				{
+					!googleMode && (
+						<div class="field-row">
+							<label>
+								{copy.password}
+								<input type="password" name="password" required minlength="8" />
+							</label>
+							<label>
+								{copy.confirmPassword}
+								<input type="password" name="confirmPassword" required minlength="8" />
+							</label>
+						</div>
+					)
+				}
 
 				<div class="field-row">
 					<label>
@@ -338,6 +395,87 @@ if (Astro.request.method === 'POST') {
 			padding: 0.75rem 1rem;
 			margin-bottom: 1.25rem;
 			font-size: 0.9rem;
+		}
+
+		.oauth-buttons {
+			display: flex;
+			flex-direction: column;
+			gap: 0.6rem;
+			margin-bottom: 0.4rem;
+		}
+
+		.oauth-btn {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 0.6rem;
+			font: inherit;
+			font-weight: 600;
+			font-size: 0.88rem;
+			padding: 0.6rem 1rem;
+			border-radius: 0.5rem;
+			border: 1px solid var(--border-light);
+			background: #fff;
+			color: var(--text-dark);
+			text-decoration: none;
+			cursor: pointer;
+		}
+
+		.oauth-btn:hover {
+			border-color: var(--accent);
+		}
+
+		.oauth-btn[disabled] {
+			cursor: not-allowed;
+			opacity: 0.55;
+		}
+
+		.oauth-btn[disabled]:hover {
+			border-color: var(--border-light);
+		}
+
+		.oauth-note {
+			margin: 0.4rem 0 0;
+			text-align: center;
+			font-size: 0.72rem;
+			color: var(--text-dark-muted);
+		}
+
+		.or-divider {
+			display: flex;
+			align-items: center;
+			margin: 1.1rem 0;
+			color: var(--text-dark-muted);
+			font-size: 0.75rem;
+		}
+
+		.or-divider::before,
+		.or-divider::after {
+			content: '';
+			flex: 1;
+			height: 1px;
+			background: var(--border-light);
+		}
+
+		.or-divider span {
+			padding: 0 0.6rem;
+		}
+
+		.google-mode-note {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			background: rgba(0, 114, 206, 0.06);
+			border: 1px solid rgba(0, 114, 206, 0.2);
+			border-radius: 0.6rem;
+			padding: 0.7rem 0.9rem;
+			margin-bottom: 1.25rem;
+			font-size: 0.82rem;
+			color: var(--text-dark);
+		}
+
+		.google-mode-note svg {
+			flex-shrink: 0;
 		}
 
 		.account-form {

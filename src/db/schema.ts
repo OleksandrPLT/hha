@@ -45,6 +45,25 @@ export const guests = sqliteTable('guests', {
 	dataProcessingConsent: integer('data_processing_consent', { mode: 'boolean' }).notNull().default(false),
 	dataProcessingConsentAt: text('data_processing_consent_at'),
 
+	// Фото профілю — data URL (base64), не файл на диску. Причина: Node
+	// standalone на Zone.ee роздає лише те, що зібрано в dist/client на
+	// етапі build — runtime-завантажені файли поза цим не роздати без
+	// окремого streaming-роута. Малі фото (ресайз до ~200x200 на клієнті
+	// перед відправкою, canvas) в SQLite як text — простіше й достатньо
+	// для масштабу хостела. avatarSource — "upload"/"google"/"telegram",
+	// щоб при повторному вручну-завантаженні не плутати походження.
+	avatarUrl: text('avatar_url'),
+	avatarSource: text('avatar_source'),
+
+	// Прив'язка Google/Telegram (2026-08-30, користувач попросив "приєднати
+	// телеграм та гугл" + автопідтяжку фото профілю). ЛИШЕ лінкування до
+	// існуючого акаунта (гість вже залогінений паролем) — не окремий
+	// спосіб входу з нуля, це свідомо простіший/безпечніший обсяг для
+	// першої версії. googleId/telegramId — унікальні ID з відповідного
+	// провайдера, не токени доступу (ті не зберігаються).
+	googleId: text('google_id').unique(),
+	telegramId: text('telegram_id').unique(),
+
 	// Відновлення пароля. Email ще не підключено (немає SMTP) — посилання
 	// поки просто показуємо на екрані замість листа, див.
 	// src/pages/[locale]/account/forgot-password.astro.

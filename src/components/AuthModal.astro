@@ -8,6 +8,7 @@
 // лишається httpOnly, тут її не читаємо).
 import type { Locale } from '../i18n/locales';
 import { account } from '../i18n/account';
+import { isGoogleOAuthConfigured } from '../lib/oauth';
 import Logo from './Logo.astro';
 
 interface Props {
@@ -18,6 +19,7 @@ const { locale } = Astro.props;
 const copy = account[locale].login;
 const regCopy = account[locale].register;
 const am = account[locale].authModal;
+const googleReady = isGoogleOAuthConfigured();
 ---
 
 <div class="auth-modal" id="auth-modal" hidden>
@@ -53,15 +55,27 @@ const am = account[locale].authModal;
 			<p class="subtitle">{am.subtitle}</p>
 
 			<div class="social-row">
-				<button type="button" class="social-btn" disabled title={am.comingSoon}>
-					<svg viewBox="0 0 24 24">
-						<path fill="#4285F4" d="M23.52 12.27c0-.82-.07-1.6-.2-2.36H12v4.47h6.47c-.28 1.5-1.13 2.78-2.4 3.63v3.02h3.88c2.27-2.09 3.57-5.17 3.57-8.76z" />
-						<path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.88-3.02c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.11C3.24 21.3 7.29 24 12 24z" />
-						<path fill="#FBBC05" d="M5.27 14.27c-.25-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27V6.62H1.26A11.97 11.97 0 0 0 0 12c0 1.93.46 3.76 1.26 5.38l4.01-3.11z" />
-						<path fill="#EA4335" d="M12 4.77c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.29 0 3.24 2.7 1.26 6.62l4.01 3.11C6.22 6.88 8.87 4.77 12 4.77z" />
-					</svg>
-					Google
-				</button>
+				{googleReady ? (
+					<a class="social-btn" href={`/api/oauth/google/start?locale=${locale}`}>
+						<svg viewBox="0 0 24 24">
+							<path fill="#4285F4" d="M23.52 12.27c0-.82-.07-1.6-.2-2.36H12v4.47h6.47c-.28 1.5-1.13 2.78-2.4 3.63v3.02h3.88c2.27-2.09 3.57-5.17 3.57-8.76z" />
+							<path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.88-3.02c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.11C3.24 21.3 7.29 24 12 24z" />
+							<path fill="#FBBC05" d="M5.27 14.27c-.25-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27V6.62H1.26A11.97 11.97 0 0 0 0 12c0 1.93.46 3.76 1.26 5.38l4.01-3.11z" />
+							<path fill="#EA4335" d="M12 4.77c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.29 0 3.24 2.7 1.26 6.62l4.01 3.11C6.22 6.88 8.87 4.77 12 4.77z" />
+						</svg>
+						Google
+					</a>
+				) : (
+					<button type="button" class="social-btn" disabled title={am.comingSoon}>
+						<svg viewBox="0 0 24 24">
+							<path fill="#4285F4" d="M23.52 12.27c0-.82-.07-1.6-.2-2.36H12v4.47h6.47c-.28 1.5-1.13 2.78-2.4 3.63v3.02h3.88c2.27-2.09 3.57-5.17 3.57-8.76z" />
+							<path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.88-3.02c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.11C3.24 21.3 7.29 24 12 24z" />
+							<path fill="#FBBC05" d="M5.27 14.27c-.25-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27V6.62H1.26A11.97 11.97 0 0 0 0 12c0 1.93.46 3.76 1.26 5.38l4.01-3.11z" />
+							<path fill="#EA4335" d="M12 4.77c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.29 0 3.24 2.7 1.26 6.62l4.01 3.11C6.22 6.88 8.87 4.77 12 4.77z" />
+						</svg>
+						Google
+					</button>
+				)}
 				<button type="button" class="social-btn" disabled title={am.comingSoon}>
 					<svg viewBox="0 0 240 240">
 						<circle cx="120" cy="120" r="120" fill="#29A9EA" />
@@ -389,8 +403,21 @@ const am = account[locale].authModal;
 		font-size: 0.82rem;
 		font-weight: 600;
 		color: var(--text-dark);
+		text-decoration: none;
+		cursor: pointer;
+	}
+
+	.social-btn:hover {
+		border-color: var(--accent);
+	}
+
+	.social-btn[disabled] {
 		cursor: not-allowed;
 		opacity: 0.55;
+	}
+
+	.social-btn[disabled]:hover {
+		border-color: var(--border-light);
 	}
 
 	.social-btn svg {
