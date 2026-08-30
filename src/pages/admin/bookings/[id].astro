@@ -167,6 +167,7 @@ const bookingPageCopy = bookingCopy[locale].page;
 			{revolutPayable && (
 				<Fragment>
 					<a href={bk.paymentCheckoutUrl!} target="_blank" rel="noopener noreferrer" id="revolut-pay-btn" class="btn-secondary btn-revolut">{bookingPageCopy.paymentRevolut}</a>
+					<button type="button" id="revolut-check-btn" class="btn-secondary">{copy.checkNow}</button>
 					<p id="pay-status" class="field-note" hidden></p>
 				</Fragment>
 			)}
@@ -194,6 +195,7 @@ const bookingPageCopy = bookingCopy[locale].page;
 		revolutPayable && (
 			<script define:vars={{ bookingId: bk.id }}>
 				const btn = document.getElementById('revolut-pay-btn');
+				const checkBtn = document.getElementById('revolut-check-btn');
 				const statusEl = document.getElementById('pay-status');
 				let polling = false;
 
@@ -211,6 +213,12 @@ const bookingPageCopy = bookingCopy[locale].page;
 					}
 				}
 
+				// Реальна оплата може зайняти хвилини — перевіряємо одразу при
+				// завантаженні (раптом вже оплачено), і довго опитуємо після кліку.
+				pollOnce().then((paid) => {
+					if (paid) window.location.reload();
+				});
+
 				btn?.addEventListener('click', () => {
 					if (polling) return;
 					polling = true;
@@ -223,12 +231,23 @@ const bookingPageCopy = bookingCopy[locale].page;
 						if (paid) {
 							clearInterval(interval);
 							window.location.reload();
-						} else if (attempts >= 40) {
+						} else if (attempts >= 240) {
 							clearInterval(interval);
-							statusEl.textContent = 'Still not confirmed — refresh this page after paying.';
+							statusEl.textContent = 'Not confirmed yet — use "Check payment now" after the guest pays.';
 							polling = false;
 						}
-					}, 4000);
+					}, 5000);
+				});
+
+				checkBtn?.addEventListener('click', async () => {
+					statusEl.hidden = false;
+					statusEl.textContent = 'Checking…';
+					const paid = await pollOnce();
+					if (paid) {
+						window.location.reload();
+					} else {
+						statusEl.textContent = 'Not paid yet.';
+					}
 				});
 			</script>
 		)

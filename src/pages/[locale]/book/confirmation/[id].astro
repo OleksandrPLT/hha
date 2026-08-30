@@ -83,6 +83,9 @@ const revolutReady = isRevolutConfigured() && Boolean(bk.paymentRef) && Boolean(
 							<a href={bk.paymentCheckoutUrl!} target="_blank" rel="noopener noreferrer" id="revolut-pay-btn" class="btn btn--primary-dark">
 								{bookingCopy[locale].page.paymentRevolut}
 							</a>
+							<button type="button" id="revolut-check-btn" class="btn btn--ghost-dark">
+								{copy.checkStatusBtn}
+							</button>
 							<p id="pay-status" class="pay-status" hidden></p>
 						</div>
 					) : needsPayment ? (
@@ -105,12 +108,16 @@ const revolutReady = isRevolutConfigured() && Boolean(bk.paymentRef) && Boolean(
 	{
 		needsPayment && revolutReady && (
 			<script define:vars={{ bookingId: bk.id }}>
-				// Оплата тепер іде на хостованій сторінці Revolut (окрема
-				// вкладка/redirect), не в embed-попапі (той відкривався порожнім —
-				// ймовірно, hha.ee не зареєстрований як embed-домен в Revolut
-				// Business). Тому тут просто опитуємо сервер після кліку, поки
-				// гість оплачує на стороні Revolut.
+				// Оплата йде на хостованій сторінці Revolut (окрема вкладка), не в
+				// embed-попапі (той відкривався порожнім — hha.ee, ймовірно, не
+				// зареєстрований як embed-домен в Revolut Business). Реальна
+				// оплата може зайняти хвилини (ручне введення картки, 3DS і т.д.),
+				// тому: (1) перевіряємо статус одразу при завантаженні сторінки —
+				// покриває випадок "гість оплатив і повернувся пізніше", (2) після
+				// кліку по кнопці оплати опитуємо довго (до ~20 хв), (3) є ручна
+				// кнопка "перевірити зараз" як підстраховка, якщо і це не встигло.
 				const btn = document.getElementById('revolut-pay-btn');
+				const checkBtn = document.getElementById('revolut-check-btn');
 				const statusEl = document.getElementById('pay-status');
 				let polling = false;
 
@@ -128,7 +135,7 @@ const revolutReady = isRevolutConfigured() && Boolean(bk.paymentRef) && Boolean(
 					}
 				}
 
-				btn?.addEventListener('click', () => {
+				function startPolling(intervalMs, maxAttempts) {
 					if (polling) return;
 					polling = true;
 					statusEl.hidden = false;
@@ -140,12 +147,33 @@ const revolutReady = isRevolutConfigured() && Boolean(bk.paymentRef) && Boolean(
 						if (paid) {
 							clearInterval(interval);
 							window.location.reload();
-						} else if (attempts >= 40) {
+						} else if (attempts >= maxAttempts) {
 							clearInterval(interval);
-							statusEl.textContent = 'Still not confirmed — refresh this page after paying.';
+							statusEl.textContent = 'Not confirmed yet — pay in the tab that opened, then use "Check payment status".';
 							polling = false;
 						}
-					}, 4000);
+					}, intervalMs);
+				}
+
+				// (1) одноразова перевірка одразу — раптом гість вже оплатив і
+				// просто повернувся/оновив сторінку.
+				pollOnce().then((paid) => {
+					if (paid) window.location.reload();
+				});
+
+				// (2) довге опитування після кліку "Оплатити".
+				btn?.addEventListener('click', () => startPolling(5000, 240));
+
+				// (3) ручна перевірка на вимогу.
+				checkBtn?.addEventListener('click', async () => {
+					statusEl.hidden = false;
+					statusEl.textContent = 'Checking…';
+					const paid = await pollOnce();
+					if (paid) {
+						window.location.reload();
+					} else {
+						statusEl.textContent = 'Not paid yet.';
+					}
 				});
 			</script>
 		)
@@ -232,6 +260,9 @@ const revolutReady = isRevolutConfigured() && Boolean(bk.paymentRef) && Boolean(
 
 		.pay-box {
 			margin-bottom: 1.25rem;
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
 		}
 
 		.pay-status {

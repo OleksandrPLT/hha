@@ -183,6 +183,7 @@ export interface AdminCopy {
 		pricePerNight: string;
 		total: string;
 		markPaid: string;
+		checkNow: string;
 		statusSection: string;
 		setPending: string;
 		setConfirmed: string;
@@ -373,6 +374,7 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			pricePerNight: 'Ціна/ніч (з ПДВ)',
 			total: 'Разом',
 			markPaid: 'Позначити оплаченим',
+			checkNow: 'Перевірити оплату зараз',
 			statusSection: 'Статус бронювання',
 			setPending: 'Очікує',
 			setConfirmed: 'Підтвердити',
@@ -561,6 +563,7 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			pricePerNight: 'Цена/ночь (с НДС)',
 			total: 'Итого',
 			markPaid: 'Отметить оплаченным',
+			checkNow: 'Проверить оплату сейчас',
 			statusSection: 'Статус бронирования',
 			setPending: 'Ожидает',
 			setConfirmed: 'Подтвердить',

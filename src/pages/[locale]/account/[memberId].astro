@@ -389,9 +389,32 @@ const hasPayableBooking = revolutReady && myBookings.some((b) => b.paymentMethod
 	{
 		hasPayableBooking && (
 			<script is:inline>
+				async function checkBooking(bookingId) {
+					try {
+						const res = await fetch('/api/booking/confirm-payment', {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ bookingId }),
+						});
+						const data = await res.json();
+						return Boolean(data.paid);
+					} catch {
+						return false;
+					}
+				}
+
+				// Одразу при завантаженні перевіряємо всі неоплачені бронювання —
+				// раптом гість вже оплатив раніше і просто відкрив кабінет знову
+				// (реальна оплата може зайняти хвилини, кліком тут не обмежуємось).
+				document.querySelectorAll('[data-pay-booking]').forEach((el) => {
+					checkBooking(Number(el.dataset.payBooking)).then((paid) => {
+						if (paid) window.location.reload();
+					});
+				});
+
 				// Клік відкриває хостовану сторінку оплати Revolut в новій вкладці
 				// (звичайне посилання, браузер сам це робить) — тут лише запускаємо
-				// опитування сервера, поки гість оплачує в тій вкладці.
+				// довге опитування сервера, поки гість оплачує в тій вкладці.
 				document.addEventListener('click', (e) => {
 					const btn = e.target.closest('[data-pay-booking]');
 					if (!btn || btn.dataset.polling === '1') return;
@@ -401,27 +424,18 @@ const hasPayableBooking = revolutReady && myBookings.some((b) => b.paymentMethod
 					let attempts = 0;
 					const interval = setInterval(async () => {
 						attempts++;
-						try {
-							const res = await fetch('/api/booking/confirm-payment', {
-								method: 'POST',
-								headers: { 'Content-Type': 'application/json' },
-								body: JSON.stringify({ bookingId }),
-							});
-							const data = await res.json();
-							if (data.paid) {
-								clearInterval(interval);
-								window.location.reload();
-								return;
-							}
-						} catch {
-							// ignore, спробуємо ще раз на наступному тіку
+						const paid = await checkBooking(bookingId);
+						if (paid) {
+							clearInterval(interval);
+							window.location.reload();
+							return;
 						}
-						if (attempts >= 40) {
+						if (attempts >= 240) {
 							clearInterval(interval);
 							btn.dataset.polling = '0';
 							btn.textContent = originalText;
 						}
-					}, 4000);
+					}, 5000);
 				});
 			</script>
 		)
