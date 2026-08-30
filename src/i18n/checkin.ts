@@ -47,6 +47,9 @@ export interface CheckinCopy {
 		subheading: string;
 		emailSent: string;
 		backHome: string;
+		accountCreatedHeading: string;
+		accountCreatedBody: string;
+		setPasswordLink: string;
 	};
 }
 
@@ -96,6 +99,9 @@ export const checkin: Record<Locale, CheckinCopy> = {
 			subheading: 'Your registration card has been received.',
 			emailSent: 'A copy has been sent to your email.',
 			backHome: 'Back to homepage',
+			accountCreatedHeading: 'We created a loyalty account for you',
+			accountCreatedBody: 'Earn points on future stays. Set a password to log in any time:',
+			setPasswordLink: 'Set your password',
 		},
 	},
 	et: {
@@ -143,6 +149,9 @@ export const checkin: Record<Locale, CheckinCopy> = {
 			subheading: 'Sinu külastajakaart on vastu võetud.',
 			emailSent: 'Koopia on saadetud sinu e-postile.',
 			backHome: 'Tagasi avalehele',
+			accountCreatedHeading: 'Lõime sulle lojaalsuskonto',
+			accountCreatedBody: 'Teeni punkte tulevaste külastuste eest. Määra parool sisselogimiseks:',
+			setPasswordLink: 'Määra parool',
 		},
 	},
 	uk: {
@@ -190,6 +199,9 @@ export const checkin: Record<Locale, CheckinCopy> = {
 			subheading: 'Вашу картку гостя отримано.',
 			emailSent: 'Копію надіслано на вашу пошту.',
 			backHome: 'На головну',
+			accountCreatedHeading: 'Ми створили для вас бонусний акаунт',
+			accountCreatedBody: "Отримуйте бали за майбутні проживання. Встановіть пароль, щоб входити будь-коли:",
+			setPasswordLink: 'Встановити пароль',
 		},
 	},
 	ru: {
@@ -237,6 +249,9 @@ export const checkin: Record<Locale, CheckinCopy> = {
 			subheading: 'Ваша карта гостя получена.',
 			emailSent: 'Копия отправлена на вашу почту.',
 			backHome: 'На главную',
+			accountCreatedHeading: 'Мы создали для вас бонусный аккаунт',
+			accountCreatedBody: 'Получайте баллы за будущие проживания. Установите пароль, чтобы входить в любое время:',
+			setPasswordLink: 'Установить пароль',
 		},
 	},
 	lv: {
@@ -284,6 +299,9 @@ export const checkin: Record<Locale, CheckinCopy> = {
 			subheading: 'Tava reģistrācijas karte ir saņemta.',
 			emailSent: 'Kopija nosūtīta uz tavu e-pastu.',
 			backHome: 'Uz sākumlapu',
+			accountCreatedHeading: 'Mēs izveidojām tev lojalitātes kontu',
+			accountCreatedBody: 'Saņem punktus par turpmākajām uzturēšanās reizēm. Iestati paroli, lai pieslēgtos jebkurā laikā:',
+			setPasswordLink: 'Iestatīt paroli',
 		},
 	},
 	fi: {
@@ -331,6 +349,9 @@ export const checkin: Record<Locale, CheckinCopy> = {
 			subheading: 'Vieraskorttisi on vastaanotettu.',
 			emailSent: 'Kopio on lähetetty sähköpostiisi.',
 			backHome: 'Etusivulle',
+			accountCreatedHeading: 'Loimme sinulle kanta-asiakastilin',
+			accountCreatedBody: 'Kerää pisteitä tulevista majoituksista. Aseta salasana kirjautuaksesi milloin tahansa:',
+			setPasswordLink: 'Aseta salasana',
 		},
 	},
 };

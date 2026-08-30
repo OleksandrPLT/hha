@@ -331,6 +331,14 @@ export type NewChatMessage = typeof chatMessages.$inferInsert;
 export const checkinCards = sqliteTable('checkin_cards', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	bookingId: integer('booking_id').references(() => bookings.id, { onDelete: 'set null' }),
+	// Прив'язка до акаунта лояльності (Фаза 2/5, 2026-08-30) — при поданні
+	// картки: якщо гість з таким email вже є — прив'язуємо; якщо немає —
+	// створюємо новий акаунт автоматично з даних анкети (само-чекін через
+	// QR/посилання від адміна реєструє гостя в бонусній системі без
+	// окремої форми реєстрації). newAccountCreated — щоб лист підтвердження
+	// міг показати "ми створили для вас акаунт" лише один раз.
+	guestId: integer('guest_id').references(() => guests.id, { onDelete: 'set null' }),
+	newAccountCreated: integer('new_account_created', { mode: 'boolean' }).notNull().default(false),
 
 	firstName: text('first_name').notNull(),
 	lastName: text('last_name').notNull(),

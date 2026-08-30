@@ -36,3 +36,14 @@ export async function generateMemberQrSvg(verifyUrl: string): Promise<string> {
 		color: { dark: '#0b0d10', light: '#ffffffff' },
 	});
 }
+
+// Загальний QR (не прив'язаний до гостя) — напр. посилання на
+// self-service чекін, яке адмін показує/друкує на ресепшені.
+export async function generateQrSvg(url: string, width = 220): Promise<string> {
+	return QRCode.toString(url, {
+		type: 'svg',
+		margin: 1,
+		width,
+		color: { dark: '#0b0d10', light: '#ffffffff' },
+	});
+}

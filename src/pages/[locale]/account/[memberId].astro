@@ -13,11 +13,11 @@ import SiteFooter from '../../../components/SiteFooter.astro';
 import { isLocale, defaultLocale, htmlLang, type Locale } from '../../../i18n/locales';
 import { account } from '../../../i18n/account';
 import { db } from '../../../db/client';
-import { guests, bookings, rooms } from '../../../db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { guests, bookings, rooms, checkinCards } from '../../../db/schema';
+import { eq, desc, isNull, and } from 'drizzle-orm';
 import { pointsToEuros } from '../../../data/loyalty';
 import { countries, isoToFlag } from '../../../data/countries';
-import { formatMemberId, memberVerifyUrl, generateMemberQrSvg } from '../../../lib/memberCard';
+import { formatMemberId, memberVerifyUrl, generateMemberQrSvg, formatCheckinCode } from '../../../lib/memberCard';
 import { booking as bookingCopy } from '../../../i18n/booking';
 import { currency } from '../../../data/pricing';
 import { isRevolutConfigured } from '../../../lib/revolut';
@@ -75,6 +75,16 @@ const qrSvg = await generateMemberQrSvg(verifyUrl);
 // лише через guestId, зроблену в момент оформлення (якщо гість тоді був
 // залогінений).
 const myBookings = db.select().from(bookings).where(eq(bookings.guestId, guestId)).orderBy(desc(bookings.createdAt)).all();
+
+// Чекіни без прив'язаного бронювання (само-чекін через QR на ресепшені,
+// 2026-08-30) — брони з таким же bookingId вже показані вище, тут лише
+// "голі" записи проживання, щоб не дублювати.
+const standaloneCheckins = db
+	.select()
+	.from(checkinCards)
+	.where(and(eq(checkinCards.guestId, guestId), isNull(checkinCards.bookingId)))
+	.orderBy(desc(checkinCards.createdAt))
+	.all();
 const roomsById = new Map(db.select().from(rooms).all().map((r) => [r.id, r]));
 const bkCopy = bookingCopy[locale];
 
@@ -341,9 +351,9 @@ const hasPayableBooking = revolutReady && myBookings.some((b) => b.paymentMethod
 						<h2>{copy.dashboard.stayHistoryTitle}</h2>
 					</div>
 					{
-						myBookings.length === 0 ? (
+						myBookings.length === 0 && standaloneCheckins.length === 0 ? (
 							<p class="empty-note">{copy.dashboard.stayHistoryEmpty}</p>
-						) : (
+						) : myBookings.length === 0 ? null : (
 							<ul class="booking-list">
 								{myBookings.map((b) => (
 									<li class="booking-item">
@@ -375,6 +385,25 @@ const hasPayableBooking = revolutReady && myBookings.some((b) => b.paymentMethod
 													</a>
 												)
 											}
+										</div>
+									</li>
+								))}
+							</ul>
+						)
+					}
+					{
+						standaloneCheckins.length > 0 && (
+							<ul class="booking-list checkin-list">
+								{standaloneCheckins.map((c) => (
+									<li class="booking-item">
+										<div class="booking-item__main">
+											<p class="booking-item__room">{formatCheckinCode(c.id)}</p>
+											<p class="booking-item__dates">
+												{c.arrivalDate} → {c.departureDate}
+											</p>
+										</div>
+										<div class="booking-item__side">
+											<span class="bk-badge bk-badge--confirmed">{copy.dashboard.stayHistoryTitle}</span>
 										</div>
 									</li>
 								))}

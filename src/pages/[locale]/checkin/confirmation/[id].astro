@@ -23,6 +23,18 @@ const card = Number.isInteger(cardId) ? db.select().from(checkinCards).where(eq(
 if (!card) {
 	return Astro.redirect(`/${locale}`);
 }
+
+// Картка містить чутливі дані (адреса, підпис) — доступ лише тому, хто
+// щойно її подав у ЦІЙ сесії (lastCheckinId, ставиться в index.astro
+// перед редіректом) АБО власнику прив'язаного акаунта. Той самий патерн,
+// що й для підтвердження бронювання — інакше будь-хто міг би підглянути
+// чужі картки, перебираючи id.
+const sessionGuestId = await Astro.session?.get('guestId');
+const lastCheckinId = await Astro.session?.get('lastCheckinId');
+const isOwner = (sessionGuestId && sessionGuestId === card.guestId) || lastCheckinId === card.id;
+if (!isOwner) {
+	return Astro.redirect(`/${locale}`);
+}
 ---
 
 <BaseLayout locale={locale} title={copy.heading} description={checkinCopy[locale].meta.description} path={`/checkin/confirmation/${cardId}`}>
@@ -37,6 +49,14 @@ if (!card) {
 				<h1>{copy.heading}</h1>
 				<p class="subtitle">{copy.subheading}</p>
 				<p class="code-badge">{formatCheckinCode(card.id)}</p>
+				{
+					card.newAccountCreated && (
+						<div class="account-note">
+							<p class="account-note__title">{copy.accountCreatedHeading}</p>
+							<p>{copy.accountCreatedBody}</p>
+						</div>
+					)
+				}
 				<p class="note">{copy.emailSent}</p>
 				<a href={`/${locale}`} class="btn btn--ghost-dark">{copy.backHome}</a>
 			</div>
@@ -87,6 +107,26 @@ if (!card) {
 			margin: 0 0 1.5rem;
 			font-size: 0.85rem;
 			color: var(--text-dark-muted);
+		}
+
+		.account-note {
+			text-align: left;
+			background: rgba(0, 114, 206, 0.06);
+			border: 1px solid rgba(0, 114, 206, 0.2);
+			border-radius: 0.7rem;
+			padding: 0.9rem 1rem;
+			margin: 0 0 1.25rem;
+			font-size: 0.85rem;
+			color: var(--text-dark);
+		}
+
+		.account-note p {
+			margin: 0;
+		}
+
+		.account-note__title {
+			font-weight: 700;
+			margin-bottom: 0.3rem !important;
 		}
 
 		.code-badge {

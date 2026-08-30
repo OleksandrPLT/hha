@@ -13,8 +13,8 @@ import { isLocale, defaultLocale, type Locale } from '../../../i18n/locales';
 import { checkin as checkinCopy } from '../../../i18n/checkin';
 import { countries } from '../../../data/countries';
 import { db } from '../../../db/client';
-import { checkinCards, bookings } from '../../../db/schema';
-import { isValidEmail } from '../../../lib/auth';
+import { checkinCards, bookings, guests } from '../../../db/schema';
+import { isValidEmail, hashPassword, generateResetToken } from '../../../lib/auth';
 import { sendMail } from '../../../lib/mailer';
 import { renderEmailHtml } from '../../../lib/emailTemplate';
 import { formatCheckinCode } from '../../../lib/memberCard';
@@ -91,10 +91,47 @@ if (Astro.request.method === 'POST') {
 	} else if (!signatureDataUrl || signatureDataUrl.length < 100) {
 		error = copy.page.errorSignature;
 	} else {
+		// Прив'язка до акаунта лояльності: є гість з таким email — прив'язуємо;
+		// немає — реєструємо автоматично (само-чекін через QR/посилання від
+		// адміна одразу заводить гостя в бонусну систему, без окремої форми).
+		let guestId: number | null = null;
+		let newAccountCreated = false;
+		let resetToken: string | null = null;
+		const existingGuest = db.select().from(guests).where(eq(guests.email, email)).get();
+		if (existingGuest) {
+			guestId = existingGuest.id;
+		} else {
+			resetToken = generateResetToken();
+			const randomPassword = await hashPassword(generateResetToken());
+			const insertedGuest = db
+				.insert(guests)
+				.values({
+					fullName: `${firstName} ${lastName}`,
+					email,
+					phone: `${phoneCountry} ${phoneNumber}`,
+					passwordHash: randomPassword,
+					nationality: citizenship,
+					dateOfBirth,
+					addressLine: street,
+					city,
+					postalCode: zipCode,
+					countryOfResidence: country,
+					dataProcessingConsent: true,
+					dataProcessingConsentAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+					resetToken,
+					resetTokenExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+				})
+				.run();
+			guestId = Number(insertedGuest.lastInsertRowid);
+			newAccountCreated = true;
+		}
+
 		const inserted = db
 			.insert(checkinCards)
 			.values({
 				bookingId: linkedBooking?.id ?? null,
+				guestId,
+				newAccountCreated,
 				firstName,
 				lastName,
 				dateOfBirth,
@@ -117,6 +154,19 @@ if (Astro.request.method === 'POST') {
 
 		try {
 			const code = formatCheckinCode(cardId);
+			const resetPath = `/${locale}/account/reset-password?token=${resetToken ?? ''}`;
+			const resetUrl = new URL(resetPath, Astro.site).toString();
+			const accountBlock = newAccountCreated && resetToken
+				? `
+					<table role="presentation" cellpadding="0" cellspacing="0" style="margin:1rem 0;background:rgba(0,114,206,0.06);border:1px solid rgba(0,114,206,0.2);border-radius:8px;width:100%;">
+						<tr><td style="padding:0.9rem 1.1rem;">
+							<p style="margin:0 0 0.4rem;font-weight:700;">${copy.confirmation.accountCreatedHeading}</p>
+							<p style="margin:0 0 0.6rem;">${copy.confirmation.accountCreatedBody}</p>
+							<a href="${resetUrl}" style="color:#0072ce;font-weight:700;">${copy.confirmation.setPasswordLink}</a>
+						</td></tr>
+					</table>
+				`
+				: '';
 			const html = renderEmailHtml({
 				heading: copy.confirmation.heading,
 				bodyHtml: `
@@ -129,6 +179,7 @@ if (Astro.request.method === 'POST') {
 					</table>
 					<p style="margin:0 0 0.3rem;"><strong>${firstName} ${lastName}</strong></p>
 					<p style="margin:0;">${copy.page.arrivalDate}: ${arrivalDate} → ${copy.page.departureDate}: ${departureDate}</p>
+					${accountBlock}
 				`,
 				footerNote: copy.confirmation.emailSent,
 			});
@@ -137,6 +188,7 @@ if (Astro.request.method === 'POST') {
 			// SMTP може бути недоступний — картка все одно збережена.
 		}
 
+		await Astro.session?.set('lastCheckinId', cardId);
 		return Astro.redirect(`/${locale}/checkin/confirmation/${cardId}`);
 	}
 }

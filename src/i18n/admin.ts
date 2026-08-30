@@ -229,6 +229,10 @@ export interface AdminCopy {
 		colVerified: string;
 		verifiedYes: string;
 		verifiedNo: string;
+		qrTitle: string;
+		qrHint: string;
+		copyLink: string;
+		copied: string;
 	};
 	checkinDetail: {
 		back: string;
@@ -491,6 +495,10 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			colVerified: 'Документ',
 			verifiedYes: 'Перевірено',
 			verifiedNo: 'Не перевірено',
+			qrTitle: 'Самостійний чекін для гостя',
+			qrHint: 'Покажіть цей QR-код або дайте посилання гостю — він сам заповнить картку на своєму телефоні.',
+			copyLink: 'Скопіювати посилання',
+			copied: 'Скопійовано!',
 		},
 		checkinDetail: {
 			back: '← Усі картки',
@@ -751,6 +759,10 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			colVerified: 'Документ',
 			verifiedYes: 'Проверено',
 			verifiedNo: 'Не проверено',
+			qrTitle: 'Самостоятельный чекин для гостя',
+			qrHint: 'Покажите этот QR-код или дайте ссылку гостю — он сам заполнит карту на своём телефоне.',
+			copyLink: 'Скопировать ссылку',
+			copied: 'Скопировано!',
 		},
 		checkinDetail: {
 			back: '← Все карты',

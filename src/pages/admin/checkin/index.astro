@@ -4,7 +4,7 @@ import { db } from '../../../db/client';
 import { admins, checkinCards } from '../../../db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { getAdminLocale, admin as adminCopy } from '../../../i18n/admin';
-import { formatCheckinCode } from '../../../lib/memberCard';
+import { formatCheckinCode, generateQrSvg } from '../../../lib/memberCard';
 
 export const prerender = false;
 
@@ -21,11 +21,32 @@ const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
 const copy = adminCopy[locale].checkinList;
 
 const allCards = db.select().from(checkinCards).orderBy(desc(checkinCards.createdAt)).all();
+
+// Самостійний чекін (за проханням користувача 2026-08-30) — QR/посилання,
+// яке адмін показує гостю (напр. на планшеті ресепшену або друком).
+// Ведемо на checkin.hha.ee (без параметрів — гість не прив'язаний до
+// конкретного бронювання, middleware сам підбере мову з Accept-Language).
+const selfCheckinUrl = 'https://checkin.hha.ee/';
+const qrSvg = await generateQrSvg(selfCheckinUrl);
 ---
 
 <AdminLayout title={copy.title} adminName={currentAdmin.fullName} activeNav="checkin">
 	<h1>{copy.title}</h1>
 	<p class="page-subtitle">{copy.subtitle}</p>
+
+	<div class="qr-card">
+		<div class="qr-card__code" set:html={qrSvg} />
+		<div class="qr-card__info">
+			<p class="qr-card__title">{copy.qrTitle}</p>
+			<p class="qr-card__hint">{copy.qrHint}</p>
+			<div class="qr-card__link-row">
+				<code>{selfCheckinUrl}</code>
+				<button type="button" id="copy-link-btn" class="copy-btn" data-url={selfCheckinUrl} data-copied-label={copy.copied} data-default-label={copy.copyLink}>
+					{copy.copyLink}
+				</button>
+			</div>
+		</div>
+	</div>
 
 	{
 		allCards.length === 0 ? (
@@ -66,11 +87,85 @@ const allCards = db.select().from(checkinCards).orderBy(desc(checkinCards.create
 		)
 	}
 
+	<script is:inline>
+		document.getElementById('copy-link-btn')?.addEventListener('click', async (e) => {
+			const btn = e.currentTarget;
+			try {
+				await navigator.clipboard.writeText(btn.dataset.url);
+				btn.textContent = btn.dataset.copiedLabel;
+				setTimeout(() => (btn.textContent = btn.dataset.defaultLabel), 1800);
+			} catch {
+				// clipboard API може бути недоступний (http/старий браузер) — тихо ігноруємо.
+			}
+		});
+	</script>
+
 	<style>
 		h1 {
 			margin: 0;
 			font-size: 1.4rem;
 			font-weight: 700;
+		}
+
+		.qr-card {
+			display: flex;
+			align-items: center;
+			gap: 1.25rem;
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			padding: 1.25rem;
+			margin-bottom: 1.5rem;
+			max-width: 40rem;
+		}
+
+		.qr-card__code {
+			flex-shrink: 0;
+			width: 110px;
+			height: 110px;
+		}
+
+		.qr-card__code :global(svg) {
+			width: 100%;
+			height: 100%;
+		}
+
+		.qr-card__title {
+			margin: 0 0 0.3rem;
+			font-weight: 700;
+			font-size: 0.95rem;
+		}
+
+		.qr-card__hint {
+			margin: 0 0 0.75rem;
+			font-size: 0.82rem;
+			color: var(--text-dark-muted);
+		}
+
+		.qr-card__link-row {
+			display: flex;
+			align-items: center;
+			gap: 0.6rem;
+			flex-wrap: wrap;
+		}
+
+		.qr-card__link-row code {
+			font-size: 0.82rem;
+			background: var(--bg-light);
+			padding: 0.3rem 0.6rem;
+			border-radius: 0.4rem;
+		}
+
+		.copy-btn {
+			font: inherit;
+			font-size: 0.78rem;
+			font-weight: 700;
+			padding: 0.35rem 0.75rem;
+			border-radius: 0.4rem;
+			border: 1px solid var(--border-light);
+			background: #fff;
+			cursor: pointer;
+			color: var(--text-dark);
 		}
 
 		.page-subtitle {
