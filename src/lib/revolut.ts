@@ -26,10 +26,16 @@ function secretKey(): string {
 	return key;
 }
 
+// Реальний API повертає state у ВЕЛИКИХ літерах ("COMPLETED", не
+// "completed") — знайдено 2026-08-30, коли живий платіж пройшов на боці
+// Revolut, а isOrderPaid() мовчки повертав false через порівняння з
+// малими літерами. Типізуємо як string і порівнюємо регістронезалежно
+// (isOrderPaid), щоб не повторити цю ж помилку, якщо Revolut колись
+// поверне інший регістр.
 export interface RevolutOrder {
 	id: string;
 	public_id: string;
-	state: 'pending' | 'processing' | 'completed' | 'cancelled' | 'failed';
+	state: string;
 	checkout_url?: string;
 	[key: string]: unknown;
 }
@@ -69,7 +75,8 @@ export async function getRevolutOrder(orderId: string): Promise<RevolutOrder> {
 	return (await res.json()) as RevolutOrder;
 }
 
-// 'completed' — платіж успішно пройшов і захоплений (AUTOMATIC capture_mode).
+// 'COMPLETED' — платіж успішно пройшов і захоплений (AUTOMATIC capture_mode).
+// Регістронезалежне порівняння — див. коментар над RevolutOrder.
 export function isOrderPaid(order: RevolutOrder): boolean {
-	return order.state === 'completed';
+	return order.state.toUpperCase() === 'COMPLETED';
 }
