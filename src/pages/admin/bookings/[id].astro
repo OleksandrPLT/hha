@@ -10,8 +10,10 @@ import { db } from '../../../db/client';
 import { admins, bookings, rooms, guests, guestNotes } from '../../../db/schema';
 import { eq } from 'drizzle-orm';
 import { getAdminLocale, admin as adminCopy } from '../../../i18n/admin';
+import { booking as bookingCopy } from '../../../i18n/booking';
 import { currency } from '../../../data/pricing';
 import { pointsForStay } from '../../../data/loyalty';
+import { isRevolutConfigured } from '../../../lib/revolut';
 
 export const prerender = false;
 
@@ -102,6 +104,13 @@ const paymentLabels: Record<string, string> = {
 function euro(cents: number): string {
 	return `${currency}${(cents / 100).toFixed(2)}`;
 }
+
+// Дозволяє адміну самому провести/протестувати Revolut-платіж за
+// бронювання, оформлене вручну (напр. по телефону) або для QA — той
+// самий віджет, що й на гостьовій сторінці підтвердження, ту саму
+// авторитетну серверну перевірку (/api/booking/confirm-payment).
+const revolutPayable = isRevolutConfigured() && bk.paymentMethod === 'revolut' && bk.paymentStatus !== 'paid' && Boolean(bk.paymentRef);
+const bookingPageCopy = bookingCopy[locale].page;
 ---
 
 <AdminLayout title={`${copy.refLabel} #${bk.id}`} adminName={currentAdmin.fullName} activeNav="bookings">
@@ -155,6 +164,12 @@ function euro(cents: number): string {
 					<button type="submit" class="btn-secondary">{copy.markPaid}</button>
 				</form>
 			)}
+			{revolutPayable && (
+				<Fragment>
+					<button type="button" id="revolut-pay-btn" class="btn-secondary btn-revolut">{bookingPageCopy.paymentRevolut}</button>
+					<p id="pay-status" class="field-note" hidden></p>
+				</Fragment>
+			)}
 		</section>
 
 		<section class="card">
@@ -174,6 +189,59 @@ function euro(cents: number): string {
 			{bk.pointsAwarded && <p class="field-note points-awarded">{copy.pointsAwarded}</p>}
 		</section>
 	</div>
+
+	{
+		revolutPayable && (
+			<Fragment>
+				<script src="https://merchant.revolut.com/embed.js" is:inline />
+				<script define:vars={{ publicId: bk.paymentRef, bookingId: bk.id, fullName: bk.fullName, email: bk.email }}>
+					const btn = document.getElementById('revolut-pay-btn');
+					const statusEl = document.getElementById('pay-status');
+
+					async function verifyOnServer() {
+						statusEl.hidden = false;
+						statusEl.textContent = 'Verifying payment…';
+						try {
+							const res = await fetch('/api/booking/confirm-payment', {
+								method: 'POST',
+								headers: { 'Content-Type': 'application/json' },
+								body: JSON.stringify({ bookingId }),
+							});
+							const data = await res.json();
+							if (data.paid) {
+								window.location.reload();
+							} else {
+								statusEl.textContent = 'Payment not completed yet.';
+							}
+						} catch {
+							statusEl.textContent = 'Could not verify payment — please refresh.';
+						}
+					}
+
+					btn?.addEventListener('click', () => {
+						if (typeof RevolutCheckout === 'undefined') {
+							statusEl.hidden = false;
+							statusEl.textContent = 'Payment widget failed to load.';
+							return;
+						}
+						RevolutCheckout(publicId, 'prod').then((instance) => {
+							instance.payWithPopup({
+								name: fullName,
+								email: email,
+								onSuccess() {
+									verifyOnServer();
+								},
+								onError() {
+									statusEl.hidden = false;
+									statusEl.textContent = 'Payment failed — please try again.';
+								},
+							});
+						});
+					});
+				</script>
+			</Fragment>
+		)
+	}
 
 	<style>
 		.back-link {
@@ -277,6 +345,10 @@ function euro(cents: number): string {
 			background: var(--bg-dark);
 			color: var(--cream);
 			border: none;
+		}
+
+		.btn-revolut {
+			background: #0666eb;
 		}
 
 		.status-actions {
