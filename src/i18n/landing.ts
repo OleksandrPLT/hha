@@ -6,6 +6,7 @@ export interface RoomCopy {
 }
 
 export interface LandingCopy {
+	metaTitle: string;
 	metaDescription: string;
 	nav: { about: string; rooms: string; pricing: string; buffet: string; location: string; contact: string; bookNow: string };
 	hero: { eyebrow: string; heading: string; subheading: string; ctaBook: string; ctaContact: string };
@@ -56,8 +57,9 @@ export interface LandingCopy {
 // і клієнт дасть більше деталей (ціни, повний список номерів/зручностей).
 export const landing: Record<Locale, LandingCopy> = {
 	en: {
+		metaTitle: 'Hostel 3A — Hostel & Hotel Rooms in Maardu, near Tallinn',
 		metaDescription:
-			'Hostel 3A by Hostel & Hotel Apartments — private and shared rooms in Maardu, Estonia, minutes from Tallinn, with an on-site buffet.',
+			'Hostel 3A in Maardu, minutes from Tallinn — private and shared rooms, free Wi-Fi, free parking, and an on-site buffet. Book directly for the best rate.',
 		nav: { about: 'About', rooms: 'Rooms', pricing: 'Prices', buffet: 'Buffet', location: 'Location', contact: 'Contact', bookNow: 'Book now' },
 		hero: {
 			eyebrow: 'Hostel 3A · Maardu, Estonia',
@@ -132,8 +134,9 @@ export const landing: Record<Locale, LandingCopy> = {
 		languageModal: { heading: 'Choose your language', subheading: 'Hostel & Hotel Apartments is available in 6 languages.', continueLabel: 'Continue' },
 	},
 	et: {
+		metaTitle: 'Hostel 3A — hostel ja hotellitoad Maardus, Tallinna lähedal',
 		metaDescription:
-			'Hostel 3A by Hostel & Hotel Apartments — privaat- ja jagatud toad Maardus, mõne minuti kaugusel Tallinnast, kohvikuga majas.',
+			'Hostel 3A Maardus, mõne minuti kaugusel Tallinnast — privaat- ja jagatud toad, tasuta WiFi, tasuta parkimine ja oma buffet. Broneeri otse parima hinnaga.',
 		nav: { about: 'Meist', rooms: 'Toad', pricing: 'Hinnad', buffet: 'Puhvet', location: 'Asukoht', contact: 'Kontakt', bookNow: 'Broneeri' },
 		hero: {
 			eyebrow: 'Hostel 3A · Maardu, Eesti',
@@ -206,7 +209,9 @@ export const landing: Record<Locale, LandingCopy> = {
 		languageModal: { heading: 'Vali keel', subheading: 'Hostel & Hotel Apartments on saadaval 6 keeles.', continueLabel: 'Jätka' },
 	},
 	uk: {
-		metaDescription: 'Hostel 3A від Hostel & Hotel Apartments — приватні та спільні номери в Маарду, за кілька хвилин від Таллінна, з власним буфетом.',
+		metaTitle: 'Hostel 3A — хостел і готель у Маарду, біля Таллінна',
+		metaDescription:
+			'Hostel 3A у Маарду, за кілька хвилин від Таллінна — приватні та спільні номери, безкоштовний Wi-Fi, безкоштовна парковка й власний буфет. Бронюйте напряму за найкращою ціною.',
 		nav: { about: 'Про нас', rooms: 'Номери', pricing: 'Ціни', buffet: 'Буфет', location: 'Розташування', contact: 'Контакти', bookNow: 'Забронювати' },
 		hero: {
 			eyebrow: 'Hostel 3A · Маарду, Естонія',
@@ -279,7 +284,9 @@ export const landing: Record<Locale, LandingCopy> = {
 		languageModal: { heading: 'Оберіть мову', subheading: 'Hostel & Hotel Apartments доступний 6 мовами.', continueLabel: 'Продовжити' },
 	},
 	ru: {
-		metaDescription: 'Hostel 3A от Hostel & Hotel Apartments — частные и общие номера в Маарду, в нескольких минутах от Таллинна, с собственным буфетом.',
+		metaTitle: 'Hostel 3A — хостел и отель в Маарду, рядом с Таллинном',
+		metaDescription:
+			'Hostel 3A в Маарду, в нескольких минутах от Таллинна — частные и общие номера, бесплатный Wi-Fi, бесплатная парковка и собственный буфет. Бронируйте напрямую по лучшей цене.',
 		nav: { about: 'О нас', rooms: 'Номера', pricing: 'Цены', buffet: 'Буфет', location: 'Расположение', contact: 'Контакты', bookNow: 'Забронировать' },
 		hero: {
 			eyebrow: 'Hostel 3A · Маарду, Эстония',
@@ -352,7 +359,9 @@ export const landing: Record<Locale, LandingCopy> = {
 		languageModal: { heading: 'Выберите язык', subheading: 'Hostel & Hotel Apartments доступен на 6 языках.', continueLabel: 'Продолжить' },
 	},
 	lv: {
-		metaDescription: 'Hostel 3A no Hostel & Hotel Apartments — privātas un kopīgas istabas Maardu, dažu minūšu attālumā no Tallinas, ar savu bufeti.',
+		metaTitle: 'Hostel 3A — hostelis un viesnīca Maardu, pie Tallinas',
+		metaDescription:
+			'Hostel 3A Maardu, dažu minūšu attālumā no Tallinas — privātas un kopīgas istabas, bezmaksas WiFi, bezmaksas autostāvvieta un sava bufete. Rezervē tieši par labāko cenu.',
 		nav: { about: 'Par mums', rooms: 'Istabas', pricing: 'Cenas', buffet: 'Bufete', location: 'Atrašanās vieta', contact: 'Kontakti', bookNow: 'Rezervēt' },
 		hero: {
 			eyebrow: 'Hostel 3A · Maardu, Igaunija',
@@ -425,7 +434,9 @@ export const landing: Record<Locale, LandingCopy> = {
 		languageModal: { heading: 'Izvēlieties valodu', subheading: 'Hostel & Hotel Apartments pieejams 6 valodās.', continueLabel: 'Turpināt' },
 	},
 	fi: {
-		metaDescription: 'Hostel 3A, Hostel & Hotel Apartments — yksityisiä ja jaettuja huoneita Maardussa, minuuttien päässä Tallinnasta, oma buffet paikan päällä.',
+		metaTitle: 'Hostel 3A — hostelli ja hotelli Maardussa, lähellä Tallinnaa',
+		metaDescription:
+			'Hostel 3A Maardussa, muutaman minuutin päässä Tallinnasta — yksityisiä ja jaettuja huoneita, ilmainen WiFi, ilmainen pysäköinti ja oma buffet. Varaa suoraan parhaalla hinnalla.',
 		nav: { about: 'Meistä', rooms: 'Huoneet', pricing: 'Hinnat', buffet: 'Buffet', location: 'Sijainti', contact: 'Yhteystiedot', bookNow: 'Varaa nyt' },
 		hero: {
 			eyebrow: 'Hostel 3A · Maardu, Viro',

@@ -53,7 +53,7 @@ const faqSchema = {
 		acceptedAnswer: { '@type': 'Answer', text: item.a },
 	})),
 };
-const title = `${property.brand} — ${property.propertyName}, ${property.city}`;
+const title = copy.metaTitle;
 
 const latestNews = (await getCollection('news', (entry) => entry.data.locale === locale))
 	.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
@@ -115,6 +115,14 @@ const packageRooms = activeRoomRows
 		perMonth: r.pricePerMonthCents! / 100,
 	}));
 
+// Ціновий діапазон і рейтинг — реальні дані (живі ціни з rooms, і бали з
+// Booking.com/Google, надані клієнтом, див. src/data/property.ts) для
+// збагачення structured data. Booking.com-бал на шкалі 1–10 (не 1–5, як
+// типово для schema.org aggregateRating) — задаємо bestRating явно, щоб
+// не спотворити цифру при парсингу Google.
+const roomPrices = activeRoomRows.map((r) => r.pricePerNightCents / 100);
+const priceRange = roomPrices.length ? `${currency}${Math.min(...roomPrices).toFixed(0)}–${currency}${Math.max(...roomPrices).toFixed(0)}` : undefined;
+
 const schema = {
 	'@context': 'https://schema.org',
 	'@type': 'LodgingBusiness',
@@ -131,7 +139,21 @@ const schema = {
 		postalCode: property.postalCode,
 		addressCountry: property.country,
 	},
-	sameAs: [property.bookingUrl],
+	...(priceRange ? { priceRange } : {}),
+	aggregateRating: {
+		'@type': 'AggregateRating',
+		ratingValue: property.bookingScore,
+		reviewCount: property.bookingReviewCount,
+		bestRating: '10',
+		worstRating: '1',
+	},
+	amenityFeature: [
+		{ '@type': 'LocationFeatureSpecification', name: 'Free WiFi', value: true },
+		{ '@type': 'LocationFeatureSpecification', name: 'Free parking', value: true },
+		{ '@type': 'LocationFeatureSpecification', name: 'Breakfast available', value: true },
+		{ '@type': 'LocationFeatureSpecification', name: 'Pet-friendly', value: true },
+	],
+	sameAs: [property.bookingUrl, property.googleReviewsUrl],
 	inLanguage: htmlLang[locale],
 };
 ---
