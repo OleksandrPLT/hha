@@ -77,3 +77,42 @@ export const guests = sqliteTable('guests', {
 
 export type Guest = typeof guests.$inferSelect;
 export type NewGuest = typeof guests.$inferInsert;
+
+// Фаза 3 (кабінет адміністратора), 2026-08-30. Проста пара логін/пароль —
+// НЕ Kursor SSO (ТЗ §5.1 передбачав SSO через id.intech.org.ua з
+// loopback-перевіркою до Kursor CRM, але H&H на Zone.ee shared hosting,
+// не на сервері Intech (31.42.188.51) — loopback туди не дотягнеться.
+// Рішення користувача 2026-08-30: простий пароль зараз, Kursor SSO —
+// окрема задача пізніше, коли вирішать питання зв'язку між серверами.
+// Немає публічної самореєстрації — акаунти створює лише сам розробник
+// напряму в БД.
+export const admins = sqliteTable('admins', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	email: text('email').notNull().unique(),
+	passwordHash: text('password_hash').notNull(),
+	fullName: text('full_name').notNull(),
+	createdAt: text('created_at')
+		.notNull()
+		.default(sql`(current_timestamp)`),
+});
+
+export type Admin = typeof admins.$inferSelect;
+export type NewAdmin = typeof admins.$inferInsert;
+
+// Внутрішні нотатки адміна про гостя (CRM, ТЗ §5.3 "внутрішня CRM-функція
+// — ліди, гості, замітки по бронюваннях"). authorId — хто написав
+// (пізніше, з кількома адмінами/персоналом, буде видно хто саме).
+export const guestNotes = sqliteTable('guest_notes', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	guestId: integer('guest_id')
+		.notNull()
+		.references(() => guests.id, { onDelete: 'cascade' }),
+	authorId: integer('author_id').references(() => admins.id),
+	body: text('body').notNull(),
+	createdAt: text('created_at')
+		.notNull()
+		.default(sql`(current_timestamp)`),
+});
+
+export type GuestNote = typeof guestNotes.$inferSelect;
+export type NewGuestNote = typeof guestNotes.$inferInsert;

@@ -1,0 +1,202 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { db } from '../../db/client';
+import { admins, guests } from '../../db/schema';
+import { eq, desc } from 'drizzle-orm';
+
+export const prerender = false;
+
+const adminId = await Astro.session?.get('adminId');
+if (!adminId) {
+	return Astro.redirect('/admin/login');
+}
+
+const admin = db.select().from(admins).where(eq(admins.id, adminId)).get();
+if (!admin) {
+	return Astro.redirect('/admin/login');
+}
+
+const allGuests = db.select().from(guests).orderBy(desc(guests.createdAt)).all();
+
+const totalGuests = allGuests.length;
+const totalPoints = allGuests.reduce((sum, g) => sum + g.loyaltyPoints, 0);
+const companyCount = allGuests.filter((g) => g.isCompany).length;
+
+const now = Date.now();
+const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+
+function toTimestamp(raw: string): number {
+	const d = new Date(raw.includes(' ') ? raw.replace(' ', 'T') + 'Z' : raw);
+	return d.getTime();
+}
+
+const newLast7 = allGuests.filter((g) => toTimestamp(g.createdAt) >= sevenDaysAgo).length;
+const newLast30 = allGuests.filter((g) => toTimestamp(g.createdAt) >= thirtyDaysAgo).length;
+
+const recent = allGuests.slice(0, 8);
+
+function formatDate(raw: string): string {
+	const d = new Date(raw.includes(' ') ? raw.replace(' ', 'T') + 'Z' : raw);
+	if (Number.isNaN(d.getTime())) return raw;
+	return new Intl.DateTimeFormat('uk-UA', { dateStyle: 'medium', timeStyle: 'short' }).format(d);
+}
+---
+
+<AdminLayout title="Огляд" adminName={admin.fullName} activeNav="overview">
+	<h1>Огляд</h1>
+	<p class="page-subtitle">Дані по гостях в реальному часі. Статистика по бронюваннях/доходах з'явиться у Фазі 4, коли запрацює система бронювання.</p>
+
+	<div class="stat-grid">
+		<div class="stat-card">
+			<p class="stat-num">{totalGuests}</p>
+			<p class="stat-label">Гостей всього</p>
+		</div>
+		<div class="stat-card">
+			<p class="stat-num">{newLast7}</p>
+			<p class="stat-label">Нових за 7 днів</p>
+		</div>
+		<div class="stat-card">
+			<p class="stat-num">{newLast30}</p>
+			<p class="stat-label">Нових за 30 днів</p>
+		</div>
+		<div class="stat-card">
+			<p class="stat-num">{companyCount}</p>
+			<p class="stat-label">Юридичних осіб</p>
+		</div>
+		<div class="stat-card">
+			<p class="stat-num">{totalPoints}</p>
+			<p class="stat-label">Бонусних балів видано</p>
+		</div>
+	</div>
+
+	<h2>Останні реєстрації</h2>
+	{
+		recent.length === 0 ? (
+			<p class="empty-note">Ще жодного гостя не зареєструвалось.</p>
+		) : (
+			<div class="table-wrap">
+				<table>
+					<thead>
+						<tr>
+							<th>Ім'я</th>
+							<th>Email</th>
+							<th>Телефон</th>
+							<th>Дата реєстрації</th>
+						</tr>
+					</thead>
+					<tbody>
+						{recent.map((g) => (
+							<tr>
+								<td><a href={`/admin/guests/${g.id}`}>{g.fullName}</a></td>
+								<td>{g.email}</td>
+								<td>{g.phone}</td>
+								<td>{formatDate(g.createdAt)}</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+		)
+	}
+
+	<style>
+		h1 {
+			margin: 0 0 0.3rem;
+			font-size: 1.4rem;
+			font-weight: 700;
+		}
+
+		.page-subtitle {
+			margin: 0 0 1.5rem;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+			max-width: 40rem;
+		}
+
+		h2 {
+			margin: 2rem 0 1rem;
+			font-size: 1.05rem;
+			font-weight: 700;
+		}
+
+		.stat-grid {
+			display: grid;
+			grid-template-columns: repeat(5, 1fr);
+			gap: 0.9rem;
+		}
+
+		.stat-card {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			padding: 1.1rem 1.2rem;
+		}
+
+		.stat-num {
+			margin: 0 0 0.2rem;
+			font-size: 1.7rem;
+			font-weight: 700;
+			color: var(--accent);
+		}
+
+		.stat-label {
+			margin: 0;
+			font-size: 0.78rem;
+			color: var(--text-dark-muted);
+		}
+
+		.empty-note {
+			color: var(--text-dark-muted);
+			font-size: 0.88rem;
+		}
+
+		.table-wrap {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			overflow-x: auto;
+		}
+
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 0.85rem;
+		}
+
+		th,
+		td {
+			text-align: left;
+			padding: 0.7rem 1rem;
+			white-space: nowrap;
+		}
+
+		thead th {
+			font-size: 0.72rem;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			color: var(--text-dark-muted);
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		tbody tr:not(:last-child) td {
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		tbody a {
+			color: var(--accent);
+			font-weight: 600;
+			text-decoration: none;
+		}
+
+		tbody a:hover {
+			text-decoration: underline;
+		}
+
+		@media (max-width: 900px) {
+			.stat-grid {
+				grid-template-columns: repeat(2, 1fr);
+			}
+		}
+	</style>
+</AdminLayout>

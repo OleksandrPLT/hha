@@ -1,0 +1,391 @@
+---
+// Картка гостя для адміна: повна анкета (та сама "максимальна анкета" з
+// Фази 2), CRM-нотатки (ТЗ §5.3), і ручне коригування бонусних балів —
+// потрібне ПРЯМО ЗАРАЗ, бо автоматичного нарахування ще нема (Фаза 4,
+// прив'язане до бронювань). Власник має спосіб вручну зарахувати бали за
+// проживання, яке пройшло повз сайт (дзвінок, Booking.com напряму).
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../db/client';
+import { admins, guests, guestNotes } from '../../../db/schema';
+import { eq, desc } from 'drizzle-orm';
+import { formatMemberId } from '../../../lib/memberCard';
+import { countries, isoToFlag } from '../../../data/countries';
+import { pointsToEuros } from '../../../data/loyalty';
+
+export const prerender = false;
+
+const adminId = await Astro.session?.get('adminId');
+if (!adminId) {
+	return Astro.redirect('/admin/login');
+}
+
+const admin = db.select().from(admins).where(eq(admins.id, adminId)).get();
+if (!admin) {
+	return Astro.redirect('/admin/login');
+}
+
+const guestId = Number(Astro.params.id);
+if (!Number.isInteger(guestId)) {
+	return Astro.redirect('/admin/guests');
+}
+
+let guest = db.select().from(guests).where(eq(guests.id, guestId)).get();
+if (!guest) {
+	return Astro.redirect('/admin/guests');
+}
+
+let error = '';
+let notice = '';
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	const action = String(form.get('action') || '');
+
+	if (action === 'add-note') {
+		const body = String(form.get('body') || '').trim();
+		if (body) {
+			db.insert(guestNotes).values({ guestId, authorId: adminId, body }).run();
+			notice = 'Нотатку додано.';
+		}
+	} else if (action === 'adjust-points') {
+		const delta = Number(form.get('delta'));
+		const reason = String(form.get('reason') || '').trim();
+		if (!Number.isFinite(delta) || delta === 0) {
+			error = 'Вкажіть кількість балів (додатну або від\'ємну).';
+		} else if (!reason) {
+			error = "Вкажіть причину нарахування/списання — вона піде в нотатки.";
+		} else {
+			const newTotal = Math.max(0, guest.loyaltyPoints + delta);
+			db.update(guests).set({ loyaltyPoints: newTotal }).where(eq(guests.id, guestId)).run();
+			db.insert(guestNotes)
+				.values({
+					guestId,
+					authorId: adminId,
+					body: `${delta > 0 ? 'Нараховано' : 'Списано'} ${Math.abs(delta)} балів. Причина: ${reason}. Новий баланс: ${newTotal}.`,
+				})
+				.run();
+			notice = 'Баланс балів оновлено.';
+		}
+	}
+
+	guest = db.select().from(guests).where(eq(guests.id, guestId)).get()!;
+}
+
+const notes = db.select().from(guestNotes).where(eq(guestNotes.guestId, guestId)).orderBy(desc(guestNotes.createdAt)).all();
+
+function countryLabel(iso: string | null): string | null {
+	if (!iso) return null;
+	const c = countries.find((c) => c.iso2 === iso);
+	return c ? `${isoToFlag(c.iso2)} ${c.name}` : iso;
+}
+
+function formatDate(raw: string | null): string {
+	if (!raw) return '—';
+	const d = new Date(raw.includes(' ') ? raw.replace(' ', 'T') + 'Z' : raw);
+	if (Number.isNaN(d.getTime())) return raw;
+	return new Intl.DateTimeFormat('uk-UA', { dateStyle: 'medium', timeStyle: 'short' }).format(d);
+}
+---
+
+<AdminLayout title={guest.fullName} adminName={admin.fullName} activeNav="guests">
+	<a href="/admin/guests" class="back-link">← Усі гості</a>
+
+	<div class="head">
+		<div class="avatar" aria-hidden="true">
+			{guest.avatarUrl ? <img src={guest.avatarUrl} alt="" /> : guest.fullName.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('')}
+		</div>
+		<div>
+			<h1>{guest.fullName}</h1>
+			<p class="member-id">{formatMemberId(guest.id)} · {guest.isCompany ? 'Юридична особа' : 'Фізична особа'}</p>
+		</div>
+	</div>
+
+	{notice && <p class="notice notice--success">{notice}</p>}
+	{error && <p class="notice notice--error">{error}</p>}
+
+	<div class="grid-2">
+		<section class="card">
+			<h2>Контакти та анкета</h2>
+			<dl>
+				<div><dt>Email</dt><dd>{guest.email}</dd></div>
+				<div><dt>Телефон</dt><dd>{guest.phone}</dd></div>
+				<div><dt>Громадянство</dt><dd>{countryLabel(guest.nationality) ?? '—'}</dd></div>
+				<div><dt>Дата народження</dt><dd>{guest.dateOfBirth ?? '—'}</dd></div>
+				<div><dt>Адреса</dt><dd>{guest.addressLine ?? '—'}</dd></div>
+				<div><dt>Місто</dt><dd>{guest.city ?? '—'}</dd></div>
+				<div><dt>Поштовий індекс</dt><dd>{guest.postalCode ?? '—'}</dd></div>
+				<div><dt>Країна проживання</dt><dd>{countryLabel(guest.countryOfResidence) ?? '—'}</dd></div>
+				<div><dt>Маркетингова згода</dt><dd>{guest.marketingConsent ? 'Так' : 'Ні'}</dd></div>
+				<div><dt>Згода на обробку даних</dt><dd>{guest.dataProcessingConsent ? `Так (${formatDate(guest.dataProcessingConsentAt)})` : 'Ні'}</dd></div>
+				<div><dt>Реєстрація</dt><dd>{formatDate(guest.createdAt)}</dd></div>
+				<div><dt>Google</dt><dd>{guest.googleId ? 'Підключено' : '—'}</dd></div>
+				<div><dt>Telegram</dt><dd>{guest.telegramId ? 'Підключено' : '—'}</dd></div>
+				{guest.isCompany && (
+					<Fragment>
+						<div><dt>Назва компанії</dt><dd>{guest.companyName ?? '—'}</dd></div>
+						<div><dt>Реєстраційний код</dt><dd>{guest.companyRegCode ?? '—'}</dd></div>
+						<div><dt>VAT</dt><dd>{guest.companyVat ?? '—'}</dd></div>
+						<div><dt>Адреса компанії</dt><dd>{guest.companyAddress ?? '—'}</dd></div>
+					</Fragment>
+				)}
+			</dl>
+		</section>
+
+		<div class="side-col">
+			<section class="card">
+				<h2>Бонусні бали</h2>
+				<p class="points-current">{guest.loyaltyPoints} <span>≈ €{pointsToEuros(guest.loyaltyPoints).toFixed(2)}</span></p>
+				<form method="POST" class="points-form">
+					<input type="hidden" name="action" value="adjust-points" />
+					<div class="points-row">
+						<input type="number" name="delta" placeholder="напр. 150 або -50" required />
+						<button type="submit">Застосувати</button>
+					</div>
+					<input type="text" name="reason" placeholder="Причина (обов'язково)" required />
+				</form>
+			</section>
+
+			<section class="card">
+				<h2>Нотатки</h2>
+				<form method="POST" class="note-form">
+					<input type="hidden" name="action" value="add-note" />
+					<textarea name="body" rows="3" placeholder="Додати нотатку про гостя..." required></textarea>
+					<button type="submit">Додати</button>
+				</form>
+				{notes.length === 0 ? (
+					<p class="empty-note">Ще немає нотаток.</p>
+				) : (
+					<ul class="notes-list">
+						{notes.map((n) => (
+							<li>
+								<p class="note-body">{n.body}</p>
+								<p class="note-date">{formatDate(n.createdAt)}</p>
+							</li>
+						))}
+					</ul>
+				)}
+			</section>
+		</div>
+	</div>
+
+	<style>
+		.back-link {
+			display: inline-block;
+			margin-bottom: 1.25rem;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+			text-decoration: none;
+		}
+
+		.back-link:hover {
+			color: var(--text-dark);
+		}
+
+		.head {
+			display: flex;
+			align-items: center;
+			gap: 1rem;
+			margin-bottom: 1.25rem;
+		}
+
+		.avatar {
+			width: 3.2rem;
+			height: 3.2rem;
+			border-radius: 50%;
+			overflow: hidden;
+			background: var(--accent);
+			color: var(--accent-ink);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-weight: 700;
+			font-size: 1.1rem;
+			flex-shrink: 0;
+		}
+
+		.avatar img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+		}
+
+		h1 {
+			margin: 0 0 0.2rem;
+			font-size: 1.3rem;
+			font-weight: 700;
+		}
+
+		.member-id {
+			margin: 0;
+			font-size: 0.82rem;
+			color: var(--text-dark-muted);
+		}
+
+		.notice {
+			border-radius: 0.6rem;
+			padding: 0.65rem 0.9rem;
+			margin-bottom: 1.1rem;
+			font-size: 0.85rem;
+		}
+
+		.notice--success {
+			background: rgba(63, 122, 79, 0.1);
+			color: var(--success);
+			border: 1px solid rgba(63, 122, 79, 0.3);
+		}
+
+		.notice--error {
+			background: rgba(234, 67, 53, 0.1);
+			color: #c0392b;
+			border: 1px solid rgba(234, 67, 53, 0.3);
+		}
+
+		.grid-2 {
+			display: grid;
+			grid-template-columns: 1.3fr 1fr;
+			gap: 1.25rem;
+			align-items: start;
+		}
+
+		.side-col {
+			display: flex;
+			flex-direction: column;
+			gap: 1.25rem;
+		}
+
+		.card {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			padding: 1.3rem 1.4rem;
+		}
+
+		.card h2 {
+			margin: 0 0 1rem;
+			font-size: 0.95rem;
+			font-weight: 700;
+		}
+
+		dl {
+			margin: 0;
+			display: grid;
+			gap: 0.75rem;
+		}
+
+		dl > div {
+			display: flex;
+			justify-content: space-between;
+			gap: 1rem;
+			font-size: 0.85rem;
+		}
+
+		dt {
+			color: var(--text-dark-muted);
+			flex-shrink: 0;
+		}
+
+		dd {
+			margin: 0;
+			font-weight: 600;
+			text-align: right;
+			overflow-wrap: anywhere;
+		}
+
+		.points-current {
+			margin: 0 0 1rem;
+			font-size: 1.7rem;
+			font-weight: 700;
+			color: var(--accent);
+		}
+
+		.points-current span {
+			font-size: 0.85rem;
+			font-weight: 500;
+			color: var(--text-dark-muted);
+		}
+
+		.points-form,
+		.note-form {
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+			margin-bottom: 1rem;
+		}
+
+		.points-row {
+			display: flex;
+			gap: 0.5rem;
+		}
+
+		.points-form input[type='number'] {
+			flex: 1;
+			min-width: 0;
+		}
+
+		input,
+		textarea {
+			font: inherit;
+			padding: 0.55rem 0.7rem;
+			border-radius: 0.5rem;
+			border: 1px solid var(--border-light);
+		}
+
+		textarea {
+			resize: vertical;
+		}
+
+		.points-form button,
+		.note-form button {
+			align-self: flex-start;
+			height: 2.2rem;
+			padding: 0 1rem;
+			border: none;
+			border-radius: 0.5rem;
+			background: var(--bg-dark);
+			color: var(--cream);
+			font-size: 0.8rem;
+			font-weight: 700;
+			cursor: pointer;
+		}
+
+		.empty-note {
+			margin: 0;
+			font-size: 0.82rem;
+			color: var(--text-dark-muted);
+		}
+
+		.notes-list {
+			list-style: none;
+			margin: 0;
+			padding: 0;
+			display: flex;
+			flex-direction: column;
+			gap: 0.75rem;
+			max-height: 22rem;
+			overflow-y: auto;
+		}
+
+		.notes-list li {
+			border-top: 1px solid var(--border-light);
+			padding-top: 0.6rem;
+		}
+
+		.note-body {
+			margin: 0 0 0.2rem;
+			font-size: 0.85rem;
+			white-space: pre-wrap;
+		}
+
+		.note-date {
+			margin: 0;
+			font-size: 0.72rem;
+			color: var(--text-dark-muted);
+		}
+
+		@media (max-width: 900px) {
+			.grid-2 {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+</AdminLayout>

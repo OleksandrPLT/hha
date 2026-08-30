@@ -1,0 +1,6 @@
+---
+// Чистимо ЛИШЕ adminId, не всю сесію — на тому ж браузері може бути
+// окрема робоча сесія гостя (guestId), її чіпати не треба.
+await Astro.session?.set('adminId', undefined);
+return Astro.redirect('/admin/login');
+---

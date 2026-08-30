@@ -1,0 +1,196 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../db/client';
+import { admins, guests } from '../../../db/schema';
+import { eq, desc, like, or } from 'drizzle-orm';
+import { formatMemberId } from '../../../lib/memberCard';
+
+export const prerender = false;
+
+const adminId = await Astro.session?.get('adminId');
+if (!adminId) {
+	return Astro.redirect('/admin/login');
+}
+
+const admin = db.select().from(admins).where(eq(admins.id, adminId)).get();
+if (!admin) {
+	return Astro.redirect('/admin/login');
+}
+
+const q = Astro.url.searchParams.get('q')?.trim() ?? '';
+
+const rows = q
+	? db
+			.select()
+			.from(guests)
+			.where(or(like(guests.fullName, `%${q}%`), like(guests.email, `%${q}%`), like(guests.phone, `%${q}%`)))
+			.orderBy(desc(guests.createdAt))
+			.all()
+	: db.select().from(guests).orderBy(desc(guests.createdAt)).all();
+
+function formatDate(raw: string): string {
+	const d = new Date(raw.includes(' ') ? raw.replace(' ', 'T') + 'Z' : raw);
+	if (Number.isNaN(d.getTime())) return raw;
+	return new Intl.DateTimeFormat('uk-UA', { dateStyle: 'medium' }).format(d);
+}
+---
+
+<AdminLayout title="Гості" adminName={admin.fullName} activeNav="guests">
+	<div class="page-head">
+		<h1>Гості</h1>
+		<p class="count-note">{rows.length} {q ? 'знайдено' : 'всього'}</p>
+	</div>
+
+	<form method="GET" class="search-form">
+		<input type="search" name="q" placeholder="Пошук за іменем, email або телефоном" value={q} />
+		<button type="submit">Знайти</button>
+		{q && <a href="/admin/guests" class="clear-link">Скинути</a>}
+	</form>
+
+	{
+		rows.length === 0 ? (
+			<p class="empty-note">{q ? 'Нічого не знайдено.' : 'Ще жодного гостя не зареєструвалось.'}</p>
+		) : (
+			<div class="table-wrap">
+				<table>
+					<thead>
+						<tr>
+							<th>ID</th>
+							<th>Ім'я</th>
+							<th>Email</th>
+							<th>Телефон</th>
+							<th>Тип</th>
+							<th>Бали</th>
+							<th>Реєстрація</th>
+						</tr>
+					</thead>
+					<tbody>
+						{rows.map((g) => (
+							<tr>
+								<td class="mono">{formatMemberId(g.id)}</td>
+								<td><a href={`/admin/guests/${g.id}`}>{g.fullName}</a></td>
+								<td>{g.email}</td>
+								<td>{g.phone}</td>
+								<td>{g.isCompany ? 'Юр. особа' : 'Фіз. особа'}</td>
+								<td>{g.loyaltyPoints}</td>
+								<td>{formatDate(g.createdAt)}</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+		)
+	}
+
+	<style>
+		.page-head {
+			display: flex;
+			align-items: baseline;
+			gap: 0.75rem;
+			margin-bottom: 1.25rem;
+		}
+
+		h1 {
+			margin: 0;
+			font-size: 1.4rem;
+			font-weight: 700;
+		}
+
+		.count-note {
+			margin: 0;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+		}
+
+		.search-form {
+			display: flex;
+			align-items: center;
+			gap: 0.6rem;
+			margin-bottom: 1.25rem;
+		}
+
+		.search-form input {
+			flex: 1;
+			max-width: 24rem;
+			font: inherit;
+			padding: 0.55rem 0.8rem;
+			border-radius: 0.5rem;
+			border: 1px solid var(--border-light);
+		}
+
+		.search-form button {
+			height: 2.3rem;
+			padding: 0 1rem;
+			border: none;
+			border-radius: 0.5rem;
+			background: var(--bg-dark);
+			color: var(--cream);
+			font-size: 0.82rem;
+			font-weight: 700;
+			cursor: pointer;
+		}
+
+		.clear-link {
+			font-size: 0.82rem;
+			color: var(--text-dark-muted);
+			text-decoration: none;
+		}
+
+		.clear-link:hover {
+			text-decoration: underline;
+		}
+
+		.empty-note {
+			color: var(--text-dark-muted);
+			font-size: 0.88rem;
+		}
+
+		.table-wrap {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			overflow-x: auto;
+		}
+
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 0.85rem;
+		}
+
+		th,
+		td {
+			text-align: left;
+			padding: 0.7rem 1rem;
+			white-space: nowrap;
+		}
+
+		.mono {
+			font-variant-numeric: tabular-nums;
+			font-size: 0.8rem;
+			color: var(--text-dark-muted);
+		}
+
+		thead th {
+			font-size: 0.72rem;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			color: var(--text-dark-muted);
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		tbody tr:not(:last-child) td {
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		tbody a {
+			color: var(--accent);
+			font-weight: 600;
+			text-decoration: none;
+		}
+
+		tbody a:hover {
+			text-decoration: underline;
+		}
+	</style>
+</AdminLayout>

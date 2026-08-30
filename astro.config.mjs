@@ -18,12 +18,18 @@ export default defineConfig({
 	site,
 	trailingSlash: 'never',
 
+	// routing: 'manual' — вимикає вбудований i18n-роутинг/middleware Astro.
+	// Локалізацію робимо повністю самі (src/i18n/locales.ts, isLocale() на
+	// кожній [locale]-сторінці) — жодного astro:i18n хелпера в коді немає.
+	// Знайдено емпірично 2026-08-30: зі стандартним routing.prefixDefaultLocale
+	// Astro 404-ить БУДЬ-ЯКУ сторінкову (не API) адресу поза [locale]-деревом
+	// (крім кореневого "/") — /admin/login і навіть тестовий /zzztest.astro
+	// повертали 404, хоча реально були в білді. /api/* не постраждав —
+	// вбудований i18n-роутинг чіпляється лише до сторінок, не до API-роутів.
 	i18n: {
 		locales,
 		defaultLocale,
-		routing: {
-			prefixDefaultLocale: true,
-		},
+		routing: 'manual',
 	},
 
 	integrations: [

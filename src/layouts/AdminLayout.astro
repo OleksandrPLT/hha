@@ -1,0 +1,218 @@
+---
+// Кабінет адміністратора (Фаза 3, ТЗ §5.3) — внутрішній інструмент, не
+// частина публічного багатомовного сайту. Свідомо БЕЗ і18n/6-мовної
+// системи, без hreflang/SEO — тільки українською, це інструмент для
+// власника/персоналу, не публічна сторінка. Окремий макет від
+// BaseLayout.astro, який несе публічний header/footer/SEO-метадані.
+interface Props {
+	title: string;
+	adminName?: string;
+	activeNav?: 'overview' | 'guests';
+}
+
+const { title, adminName, activeNav } = Astro.props;
+---
+
+<!doctype html>
+<html lang="uk">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>{title} — Адмін-панель Hostel 3A</title>
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<style>
+			@import '@fontsource-variable/inter';
+
+			:root {
+				--bg-dark: #0b0d10;
+				--surface-dark: #12151a;
+				--surface-dark-2: #171b24;
+				--border-dark: #262b36;
+				--cream: #f5f5f3;
+				--cream-muted: #c3c7cd;
+				--muted: #8a8f98;
+				--accent: #0072ce;
+				--accent-ink: #f5f5f3;
+				--bg-light: #f5f6f8;
+				--text-dark: #14161a;
+				--text-dark-muted: #5b6068;
+				--border-light: #e2e5ea;
+				--danger: #b3432f;
+				--success: #3f7a4f;
+			}
+
+			*,
+			*::before,
+			*::after {
+				box-sizing: border-box;
+			}
+
+			html,
+			body {
+				margin: 0;
+				padding: 0;
+			}
+
+			body {
+				font-family: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+				-webkit-font-smoothing: antialiased;
+				background: var(--bg-light);
+				color: var(--text-dark);
+			}
+
+			a {
+				color: inherit;
+			}
+
+			.admin-shell {
+				display: flex;
+				min-height: 100vh;
+			}
+
+			.admin-sidebar {
+				width: 15rem;
+				flex-shrink: 0;
+				background: var(--bg-dark);
+				color: var(--cream);
+				padding: 1.5rem 1rem;
+				display: flex;
+				flex-direction: column;
+			}
+
+			.admin-brand {
+				font-weight: 700;
+				font-size: 0.95rem;
+				margin: 0 0 0.2rem;
+				padding: 0 0.6rem;
+			}
+
+			.admin-brand-sub {
+				font-size: 0.7rem;
+				color: var(--cream-muted);
+				margin: 0 0 1.5rem;
+				padding: 0 0.6rem;
+			}
+
+			.admin-nav {
+				list-style: none;
+				margin: 0;
+				padding: 0;
+				display: flex;
+				flex-direction: column;
+				gap: 0.15rem;
+			}
+
+			.admin-nav a {
+				display: block;
+				padding: 0.55rem 0.7rem;
+				border-radius: 0.5rem;
+				text-decoration: none;
+				color: var(--cream-muted);
+				font-size: 0.88rem;
+				font-weight: 500;
+			}
+
+			.admin-nav a:hover,
+			.admin-nav a.is-active {
+				background: rgba(0, 114, 206, 0.15);
+				color: var(--cream);
+			}
+
+			.admin-sidebar-foot {
+				margin-top: auto;
+				padding-top: 1rem;
+				border-top: 1px solid var(--border-dark);
+			}
+
+			.admin-who {
+				font-size: 0.78rem;
+				color: var(--cream-muted);
+				padding: 0 0.6rem;
+				margin: 0 0 0.6rem;
+			}
+
+			.admin-logout-btn {
+				width: 100%;
+				text-align: left;
+				background: none;
+				border: none;
+				color: var(--cream-muted);
+				font: inherit;
+				font-size: 0.85rem;
+				font-weight: 500;
+				padding: 0.55rem 0.7rem;
+				border-radius: 0.5rem;
+				cursor: pointer;
+			}
+
+			.admin-logout-btn:hover {
+				background: rgba(179, 67, 47, 0.15);
+				color: #ff8f75;
+			}
+
+			.admin-main {
+				flex: 1;
+				min-width: 0;
+				padding: 2rem 2.5rem;
+			}
+
+			@media (max-width: 760px) {
+				.admin-shell {
+					flex-direction: column;
+				}
+
+				.admin-sidebar {
+					width: 100%;
+					flex-direction: row;
+					align-items: center;
+					flex-wrap: wrap;
+					gap: 0.5rem;
+				}
+
+				.admin-brand,
+				.admin-brand-sub {
+					display: none;
+				}
+
+				.admin-nav {
+					flex-direction: row;
+				}
+
+				.admin-sidebar-foot {
+					margin-top: 0;
+					margin-left: auto;
+					border-top: none;
+					padding-top: 0;
+				}
+
+				.admin-who {
+					display: none;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div class="admin-shell">
+			<aside class="admin-sidebar">
+				<p class="admin-brand">Hostel 3A</p>
+				<p class="admin-brand-sub">Адмін-панель</p>
+				<nav>
+					<ul class="admin-nav">
+						<li><a href="/admin" class={activeNav === 'overview' ? 'is-active' : ''}>Огляд</a></li>
+						<li><a href="/admin/guests" class={activeNav === 'guests' ? 'is-active' : ''}>Гості</a></li>
+					</ul>
+				</nav>
+				<div class="admin-sidebar-foot">
+					{adminName && <p class="admin-who">{adminName}</p>}
+					<form method="POST" action="/admin/logout">
+						<button type="submit" class="admin-logout-btn">Вийти</button>
+					</form>
+				</div>
+			</aside>
+			<main class="admin-main">
+				<slot />
+			</main>
+		</div>
+	</body>
+</html>
