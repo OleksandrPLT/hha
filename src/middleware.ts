@@ -1,32 +1,45 @@
-// Технічний режим (пароль на весь сайт) — на час викочування нової
-// SSR-версії на прод, щоб публіка не бачила процес деплою. Вмикається
-// змінною середовища MAINTENANCE_PASSWORD (в .env на СЕРВЕРІ, не в git) —
-// якщо вона не встановлена, middleware взагалі нічого не робить (як зараз
-// локально в dev). Прибрати ворота перед реальним запуском (дата з ТЗ:
-// 01.09.2026) — просто видалити змінну на сервері й перезапустити PM2,
+// "М'який" тех-режим — публічно всі бачать гарну "Незабаром" сторінку з
+// таймером (src/lib/comingSoonPage.ts), а не браузерний Basic Auth
+// логін-попап (був спочатку, користувач попросив прибрати 2026-08-30: "не
+// потрібно логін пароль а щоб і залишився що в розробці з тамером").
+//
+// Реальний сайт лишається доступним для нас через preview-ключ у query:
+// https://hha.ee/?key=<MAINTENANCE_PASSWORD> — ставить cookie на 30 днів і
+// редиректить на чистий URL; далі кожен запит з цією cookie бачить справжній
+// сайт як звичайно. Вимикається (для реального запуску, 01.09.2026 по ТЗ) —
+// прибрати MAINTENANCE_PASSWORD з .env на сервері й перезапустити PM2,
 // правити код не треба.
 import 'dotenv/config';
 import { defineMiddleware } from 'astro:middleware';
+import { detectLocaleFromPath, renderComingSoonPage } from './lib/comingSoonPage';
+
+const PREVIEW_COOKIE = 'hha_preview';
 
 export const onRequest = defineMiddleware(async (context, next) => {
 	const password = process.env.MAINTENANCE_PASSWORD;
 	if (!password) return next();
 
-	const authHeader = context.request.headers.get('authorization');
-	if (authHeader?.startsWith('Basic ')) {
-		const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf-8');
-		const sep = decoded.indexOf(':');
-		const suppliedPassword = sep >= 0 ? decoded.slice(sep + 1) : decoded;
-		if (suppliedPassword === password) {
-			return next();
-		}
+	const url = new URL(context.request.url);
+	const keyParam = url.searchParams.get('key');
+
+	if (keyParam === password) {
+		url.searchParams.delete('key');
+		context.cookies.set(PREVIEW_COOKIE, password, {
+			path: '/',
+			httpOnly: true,
+			sameSite: 'lax',
+			maxAge: 60 * 60 * 24 * 30,
+		});
+		return context.redirect(url.pathname + url.search, 302);
 	}
 
-	// Значення HTTP-заголовків мусять бути ByteString (лише ASCII/Latin1) —
-	// тире "—" тут ламало Response з незрозумілою помилкою undici глибоко
-	// всередині адаптера, тому лишаємо звичайний дефіс.
-	return new Response('Site under maintenance', {
-		status: 401,
-		headers: { 'WWW-Authenticate': 'Basic realm="Hostel and Hotel Apartments - preview"' },
+	if (context.cookies.get(PREVIEW_COOKIE)?.value === password) {
+		return next();
+	}
+
+	const locale = detectLocaleFromPath(url.pathname);
+	return new Response(renderComingSoonPage(locale), {
+		status: 200,
+		headers: { 'content-type': 'text/html; charset=utf-8' },
 	});
 });

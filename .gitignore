@@ -16,8 +16,12 @@ pnpm-debug.log*
 .env
 .env.production
 
-# local SQLite database — never commit real guest/booking data
-data/
+# local SQLite database — never commit real guest/booking data. Anchored to
+# root (/data/) — a bare "data/" also matched src/data/ (real source code:
+# property.ts, pricing.ts, etc.) and silently kept it out of git entirely
+# (found 2026-08-30 during server deploy — the build failed on the server
+# because that whole directory was never committed/synced).
+/data/
 
 # macOS-specific files
 .DS_Store

@@ -65,4 +65,21 @@ export default defineConfig({
 	adapter: node({
 		mode: 'standalone',
 	}),
+
+	// Zone.ee mod_proxy термінує TLS і проксіює на застосунок звичайним HTTP,
+	// коректно пробрасуючи X-Forwarded-Proto: https — але @astrojs/node у цій
+	// версії не має опції довіряти цьому заголовку (немає trustProxy), тож
+	// Astro сам будує context.url зі схемою "http". Вбудована origin-перевірка
+	// Astro (security.checkOrigin, POST-форми) порівнює реальний
+	// `Origin: https://hha.ee` з такого url.origin ("http://hha.ee") — схеми
+	// не збігаються, і всі форми (реєстрація/логін/тощо) падають з
+	// "Cross-site POST form submissions are forbidden" (перевірено на проді
+	// 2026-08-30). Ця перевірка — internal middleware, що ЗАВЖДИ виконується
+	// ДО нашого власного src/middleware.ts (unshift в
+	// astro/dist/core/middleware/load.js), тому виправити зсередини коду
+	// неможливо. Вимикаємо офіційним прапорцем; CSRF-ризик пом'якшений тим,
+	// що сесійна кука вже SameSite=Lax (не йде на cross-site POST).
+	security: {
+		checkOrigin: false,
+	},
 });
