@@ -106,6 +106,81 @@ const revolutReady = isRevolutConfigured() && Boolean(bk.paymentRef) && Boolean(
 
 	<SiteFooter locale={locale} />
 
+	<script
+		define:vars={{
+			bookingId: bk.id,
+			bookingRef: `BK-${String(bk.id).padStart(6, '0')}`,
+			roomSlug: room?.slug ?? '',
+			roomTitle,
+			nights: bk.nights,
+			guestsCount: bk.guestsCount,
+			pricePerNight: bk.pricePerNightCents / 100,
+			totalValue: bk.totalCents / 100,
+			paymentMethod: bk.paymentMethod,
+			paymentStatus: bk.paymentStatus,
+			bookingSource: bk.source,
+			locale,
+		}}
+	>
+		// GTM/GA4 — детальні події конверсії (за проханням користувача
+		// 2026-08-30). booking_confirmed фіксує саму бронь як лід (незалежно
+		// від методу оплати); purchase — тільки коли оплату реально
+		// підтверджено (Revolut real-time, або "на місці" вже позначено
+		// оплаченим адміном). Дедуп через localStorage — сторінка може
+		// перезавантажуватись (авточек статусу оплати), подія не повинна
+		// рахуватись двічі.
+		window.dataLayer = window.dataLayer || [];
+
+		function pushOnce(key, payload) {
+			const flagKey = 'hha_gtm_' + key + '_' + bookingId;
+			if (localStorage.getItem(flagKey)) return;
+			window.dataLayer.push(payload);
+			try {
+				localStorage.setItem(flagKey, '1');
+			} catch {
+				// приватний режим / заблоковане сховище — подія все одно пішла, просто без дедупу наступного разу
+			}
+		}
+
+		const item = {
+			item_id: roomSlug,
+			item_name: roomTitle,
+			item_category: 'room',
+			price: pricePerNight,
+			quantity: nights,
+		};
+
+		pushOnce('booking_confirmed', {
+			event: 'booking_confirmed',
+			transaction_id: bookingRef,
+			value: totalValue,
+			currency: 'EUR',
+			payment_method: paymentMethod,
+			booking_source: bookingSource,
+			nights,
+			guests_count: guestsCount,
+			locale,
+			items: [item],
+		});
+
+		if (paymentStatus === 'paid') {
+			pushOnce('purchase', {
+				event: 'purchase',
+				ecommerce: {
+					transaction_id: bookingRef,
+					value: totalValue,
+					currency: 'EUR',
+					payment_type: paymentMethod,
+					items: [item],
+				},
+				booking_source: bookingSource,
+				nights,
+				guests_count: guestsCount,
+				locale,
+			});
+		}
+	</script>
+
 	{
 		needsPayment && revolutReady && (
 			<script define:vars={{ bookingId: bk.id }}>

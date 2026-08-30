@@ -116,7 +116,10 @@ if (Astro.request.method === 'POST') {
 			if (telegramMode) await Astro.session?.set('pendingTelegram', undefined);
 			await Astro.session?.set('guestId', Number(inserted.lastInsertRowid));
 			Astro.cookies.set('hha_signed_in', '1', { path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 30 });
-			return Astro.redirect(`/${locale}/account/${formatMemberId(Number(inserted.lastInsertRowid))}`);
+			// ?welcome=<method> — одноразовий прапорець для GTM sign_up події на
+			// дашборді (2026-08-30), сама сторінка дашборду прибирає його з URL.
+			const signupMethod = googleMode ? 'google' : telegramMode ? 'telegram' : 'password';
+			return Astro.redirect(`/${locale}/account/${formatMemberId(Number(inserted.lastInsertRowid))}?welcome=${signupMethod}`);
 		}
 	}
 }

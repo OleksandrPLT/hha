@@ -65,6 +65,33 @@ if (!isOwner) {
 
 	<SiteFooter locale={locale} />
 
+	<script
+		define:vars={{
+			cardId: card.id,
+			hasLinkedBooking: Boolean(card.bookingId),
+			newAccountCreated: card.newAccountCreated,
+			locale,
+		}}
+	>
+		// GTM checkin_submitted (2026-08-30) — дедуп через localStorage, та
+		// сама сторінка може перезавантажуватись.
+		window.dataLayer = window.dataLayer || [];
+		const flagKey = 'hha_gtm_checkin_' + cardId;
+		if (!localStorage.getItem(flagKey)) {
+			window.dataLayer.push({
+				event: 'checkin_submitted',
+				linked_to_booking: hasLinkedBooking,
+				new_loyalty_account: newAccountCreated,
+				locale,
+			});
+			try {
+				localStorage.setItem(flagKey, '1');
+			} catch {
+				// приватний режим — не критично, подія все одно вже пішла
+			}
+		}
+	</script>
+
 	<style>
 		.confirmation-page {
 			background: var(--bg-light);

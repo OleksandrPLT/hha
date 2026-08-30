@@ -112,6 +112,10 @@ const bookingPaymentLabels: Record<string, string> = {
 };
 const revolutReady = isRevolutConfigured();
 const hasPayableBooking = revolutReady && myBookings.some((b) => b.paymentMethod === 'revolut' && b.paymentStatus !== 'paid' && b.paymentRef && b.paymentCheckoutUrl);
+
+// GTM sign_up подія (2026-08-30) — одноразовий прапорець ?welcome=<method>
+// з register.astro, знімається з URL після пушу в dataLayer.
+const welcomeMethod = Astro.url.searchParams.get('welcome');
 ---
 
 <BaseLayout locale={locale} title={`${copy.dashboard.title} — Hostel & Hotel Apartments`} description={copy.dashboard.title} path={`/account/${memberId}`}>
@@ -471,6 +475,20 @@ const hasPayableBooking = revolutReady && myBookings.some((b) => b.paymentMethod
 	}
 
 	<SiteFooter locale={locale} />
+
+	{
+		welcomeMethod && (
+			<script define:vars={{ welcomeMethod, locale }}>
+				window.dataLayer = window.dataLayer || [];
+				window.dataLayer.push({ event: 'sign_up', method: welcomeMethod, locale });
+				// прибираємо ?welcome= з адресного рядка, щоб подія не пушилась
+				// повторно при оновленні сторінки.
+				const url = new URL(window.location.href);
+				url.searchParams.delete('welcome');
+				window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+			</script>
+		)
+	}
 
 	<style>
 		.dash {
