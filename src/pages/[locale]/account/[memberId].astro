@@ -20,6 +20,7 @@ import { countries, isoToFlag } from '../../../data/countries';
 import { formatMemberId, memberVerifyUrl, generateMemberQrSvg } from '../../../lib/memberCard';
 import { booking as bookingCopy } from '../../../i18n/booking';
 import { currency } from '../../../data/pricing';
+import { isRevolutConfigured } from '../../../lib/revolut';
 
 const rawLocale = Astro.params.locale;
 if (!rawLocale || !isLocale(rawLocale)) {
@@ -99,6 +100,8 @@ const bookingPaymentLabels: Record<string, string> = {
 	unpaid: bkCopy.confirmation.paymentUnpaid,
 	refunded: bkCopy.confirmation.paymentUnpaid,
 };
+const revolutReady = isRevolutConfigured();
+const hasPayableBooking = revolutReady && myBookings.some((b) => b.paymentMethod === 'revolut' && b.paymentStatus !== 'paid' && b.paymentRef);
 ---
 
 <BaseLayout locale={locale} title={`${copy.dashboard.title} — Hostel & Hotel Apartments`} description={copy.dashboard.title} path={`/account/${memberId}`}>
@@ -359,6 +362,20 @@ const bookingPaymentLabels: Record<string, string> = {
 												<span class={`bk-badge bk-badge--${b.status}`}>{bookingStatusLabels[b.status] ?? b.status}</span>
 												<span class={`bk-badge ${b.paymentStatus === 'paid' ? 'bk-badge--paid' : ''}`}>{bookingPaymentLabels[b.paymentStatus] ?? b.paymentStatus}</span>
 											</div>
+											{
+												revolutReady && b.paymentMethod === 'revolut' && b.paymentStatus !== 'paid' && b.paymentRef && (
+													<button
+														type="button"
+														class="booking-item__pay-btn"
+														data-pay-booking={b.id}
+														data-public-id={b.paymentRef}
+														data-full-name={b.fullName}
+														data-email={b.email}
+													>
+														{bkCopy.page.paymentRevolut}
+													</button>
+												)
+											}
 										</div>
 									</li>
 								))}
@@ -369,6 +386,64 @@ const bookingPaymentLabels: Record<string, string> = {
 			</div>
 		</div>
 	</main>
+
+	{
+		hasPayableBooking && (
+			<Fragment>
+				<script src="https://merchant.revolut.com/embed.js" is:inline />
+				<script is:inline>
+					document.addEventListener('click', (e) => {
+						const btn = e.target.closest('[data-pay-booking]');
+						if (!btn) return;
+						const bookingId = Number(btn.dataset.payBooking);
+						const publicId = btn.dataset.publicId;
+						const fullName = btn.dataset.fullName;
+						const email = btn.dataset.email;
+						if (typeof RevolutCheckout === 'undefined') {
+							btn.textContent = 'Widget failed to load';
+							return;
+						}
+						const originalText = btn.textContent;
+						btn.disabled = true;
+						btn.textContent = '…';
+						RevolutCheckout(publicId, 'prod').then((instance) => {
+							btn.disabled = false;
+							btn.textContent = originalText;
+							instance.payWithPopup({
+								name: fullName,
+								email: email,
+								async onSuccess() {
+									btn.disabled = true;
+									btn.textContent = 'Verifying…';
+									try {
+										const res = await fetch('/api/booking/confirm-payment', {
+											method: 'POST',
+											headers: { 'Content-Type': 'application/json' },
+											body: JSON.stringify({ bookingId }),
+										});
+										const data = await res.json();
+										if (data.paid) {
+											window.location.reload();
+										} else {
+											btn.disabled = false;
+											btn.textContent = originalText;
+										}
+									} catch {
+										btn.disabled = false;
+										btn.textContent = originalText;
+									}
+								},
+								onError() {
+									btn.disabled = false;
+									btn.textContent = originalText;
+								},
+							});
+						});
+					});
+				</script>
+			</Fragment>
+		)
+	}
 
 	<SiteFooter locale={locale} />
 
@@ -742,6 +817,23 @@ const bookingPaymentLabels: Record<string, string> = {
 		.bk-badge--cancelled {
 			background: rgba(179, 67, 47, 0.12);
 			color: #b3432f;
+		}
+
+		.booking-item__pay-btn {
+			font: inherit;
+			font-size: 0.78rem;
+			font-weight: 700;
+			padding: 0.4rem 0.8rem;
+			border-radius: 0.5rem;
+			border: none;
+			background: #0666eb;
+			color: #fff;
+			cursor: pointer;
+		}
+
+		.booking-item__pay-btn:disabled {
+			opacity: 0.6;
+			cursor: default;
 		}
 
 		@media (max-width: 860px) {
