@@ -74,12 +74,6 @@ const qrSvg = await generateMemberQrSvg(verifyUrl);
 	<main class="dash">
 		<div class="dash-shell">
 			<aside class="dash-sidebar">
-				<div class="member-card">
-					<div class="member-card__qr" set:html={qrSvg} />
-					<p class="member-card__id">{memberId}</p>
-					<p class="member-card__note">{copy.dashboard.scanNote}</p>
-				</div>
-
 				<div class="loyalty-card">
 					<p class="loyalty-card__label">{copy.dashboard.loyaltyPoints}</p>
 					<p class="loyalty-card__points">
@@ -87,6 +81,12 @@ const qrSvg = await generateMemberQrSvg(verifyUrl);
 						<span>≈ €{pointsToEuros(guest.loyaltyPoints).toFixed(2)}</span>
 					</p>
 					<p class="loyalty-card__note">{copy.dashboard.loyaltyNote}</p>
+				</div>
+
+				<div class="member-card">
+					<div class="member-card__qr" set:html={qrSvg} />
+					<p class="member-card__id">{memberId}</p>
+					<p class="member-card__note">{copy.dashboard.scanNote}</p>
 				</div>
 
 				<nav aria-label="Account">
