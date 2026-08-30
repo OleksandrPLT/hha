@@ -15,6 +15,9 @@ import { hashPassword, isValidEmail, generateResetToken } from '../../../lib/aut
 import { formatMemberId } from '../../../lib/memberCard';
 import { isGoogleOAuthConfigured, fetchAndEncodeAvatar } from '../../../lib/oauth';
 import { isTelegramConfigured, telegramBotUsername } from '../../../lib/telegram';
+import { linkOrganization } from '../../../lib/organization';
+import { sendMail } from '../../../lib/mailer';
+import { renderEmailHtml } from '../../../lib/emailTemplate';
 import { eq } from 'drizzle-orm';
 
 const rawLocale = Astro.params.locale;
@@ -84,6 +87,13 @@ if (Astro.request.method === 'POST') {
 			const avatarSourceUrl = googleMode ? pendingGoogle?.picture : telegramMode ? pendingTelegram?.photoUrl : null;
 			const avatarUrl = avatarSourceUrl ? await fetchAndEncodeAvatar(avatarSourceUrl) : null;
 
+			const companyName = String(form.get('companyName') || '');
+			const companyRegCode = String(form.get('companyRegCode') || '');
+			const companyVat = String(form.get('companyVat') || '');
+			const companyAddress = String(form.get('companyAddress') || '');
+			const organizationId = isCompany && (companyName || companyRegCode) ? linkOrganization({ name: companyName, regCode: companyRegCode, vat: companyVat, address: companyAddress }) : null;
+			const verificationToken = generateResetToken();
+
 			const inserted = db
 				.insert(guests)
 				.values({
@@ -92,10 +102,11 @@ if (Astro.request.method === 'POST') {
 					phone: `${phoneCountry} ${phoneNumber}`,
 					passwordHash,
 					isCompany,
-					companyName: isCompany ? String(form.get('companyName') || '') || null : null,
-					companyRegCode: isCompany ? String(form.get('companyRegCode') || '') || null : null,
-					companyVat: isCompany ? String(form.get('companyVat') || '') || null : null,
-					companyAddress: isCompany ? String(form.get('companyAddress') || '') || null : null,
+					companyName: isCompany ? companyName || null : null,
+					companyRegCode: isCompany ? companyRegCode || null : null,
+					companyVat: isCompany ? companyVat || null : null,
+					companyAddress: isCompany ? companyAddress || null : null,
+					organizationId,
 					nationality: String(form.get('nationality') || '') || null,
 					dateOfBirth: String(form.get('dateOfBirth') || '') || null,
 					addressLine: String(form.get('address') || '') || null,
@@ -109,8 +120,27 @@ if (Astro.request.method === 'POST') {
 					telegramId: telegramMode ? pendingTelegram?.id : null,
 					avatarUrl: avatarUrl,
 					avatarSource: avatarUrl ? (googleMode ? 'google' : 'telegram') : null,
+					// OAuth/Telegram — email прийшов від довіреного провайдера,
+					// окрема верифікація не потрібна (2026-08-30).
+					emailVerified: oauthMode,
+					emailVerificationToken: oauthMode ? null : verificationToken,
 				})
 				.run();
+
+			if (!oauthMode) {
+				try {
+					const verifyUrl = new URL(`/${locale}/account/verify-email?token=${verificationToken}`, Astro.site).toString();
+					const html = renderEmailHtml({
+						heading: copy.verifyEmailHeading,
+						bodyHtml: `<p>${copy.verifyEmailBody}</p><p><a href="${verifyUrl}" style="display:inline-block;padding:0.6rem 1.1rem;background:#0072ce;color:#fff;border-radius:6px;text-decoration:none;font-weight:700;">${copy.verifyEmailCta}</a></p>`,
+					});
+					await sendMail(email, copy.verifyEmailSubject, html);
+				} catch {
+					// SMTP може бути недоступний — реєстрація все одно валідна,
+					// гість лишається emailVerified=false, можна повторно
+					// надіслати з профілю.
+				}
+			}
 
 			if (googleMode) await Astro.session?.set('pendingGoogle', undefined);
 			if (telegramMode) await Astro.session?.set('pendingTelegram', undefined);

@@ -1,0 +1,391 @@
+---
+// Бланк інвойсу (2026-08-30, "должен быть на фирменом бланке") —
+// друкована/PDF-подібна сторінка (браузерний "Друк → Зберегти як PDF",
+// без окремої PDF-бібліотеки). Реквізити відправника — статичні дані
+// власника з src/data/property.ts (реальний Revolut Business рахунок,
+// надано користувачем напряму в чат). Дані одержувача — знімок з моменту
+// видачі (billToName/Address/RegCode/Vat на самому інвойсі, не
+// підтягуються заново з профілю/організації).
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../db/client';
+import { admins, invoices, bookings, rooms } from '../../../db/schema';
+import { eq } from 'drizzle-orm';
+import { getAdminLocale, admin as adminCopy } from '../../../i18n/admin';
+import { property } from '../../../data/property';
+import { currency, vatRatePercent } from '../../../data/pricing';
+
+export const prerender = false;
+
+const adminId = await Astro.session?.get('adminId');
+if (!adminId) {
+	return Astro.redirect('/admin/login');
+}
+const currentAdmin = db.select().from(admins).where(eq(admins.id, adminId)).get();
+if (!currentAdmin) {
+	return Astro.redirect('/admin/login');
+}
+
+const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = adminCopy[locale].invoiceDetail;
+const listCopy = adminCopy[locale].invoicesList;
+
+const invoiceId = Number(Astro.params.id);
+if (!Number.isInteger(invoiceId)) {
+	return Astro.redirect('/admin/invoices');
+}
+let invoice = db.select().from(invoices).where(eq(invoices.id, invoiceId)).get();
+if (!invoice) {
+	return Astro.redirect('/admin/invoices');
+}
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	const action = String(form.get('action') || '');
+	if (action === 'mark-paid') {
+		db.update(invoices).set({ status: 'paid' }).where(eq(invoices.id, invoiceId)).run();
+	} else if (action === 'cancel') {
+		db.update(invoices).set({ status: 'cancelled' }).where(eq(invoices.id, invoiceId)).run();
+	}
+	invoice = db.select().from(invoices).where(eq(invoices.id, invoiceId)).get()!;
+}
+
+const bk = db.select().from(bookings).where(eq(bookings.id, invoice.bookingId)).get();
+const room = bk ? db.select().from(rooms).where(eq(rooms.id, bk.roomId)).get() : undefined;
+function roomTitle(): string {
+	if (!room) return '';
+	try {
+		return (JSON.parse(room.titles) as Record<string, string>).en ?? room.slug;
+	} catch {
+		return room.slug;
+	}
+}
+
+const statusLabels: Record<string, string> = {
+	issued: listCopy.statusIssued,
+	paid: listCopy.statusPaid,
+	cancelled: listCopy.statusCancelled,
+};
+
+function euro(cents: number): string {
+	return `${currency}${(cents / 100).toFixed(2)}`;
+}
+---
+
+<AdminLayout title={invoice.invoiceNumber} adminName={currentAdmin.fullName} activeNav="invoices">
+	<div class="no-print">
+		<a href="/admin/invoices" class="back-link">{copy.back}</a>
+		<div class="actions-row">
+			<button type="button" class="btn-secondary" onclick="window.print()">{copy.printBtn}</button>
+			{invoice.status === 'issued' && (
+				<form method="POST">
+					<input type="hidden" name="action" value="mark-paid" />
+					<button type="submit" class="btn-secondary">{copy.markPaidBtn}</button>
+				</form>
+			)}
+			{invoice.status !== 'cancelled' && (
+				<form method="POST" onsubmit={`return confirm(${JSON.stringify(copy.confirmCancel)})`}>
+					<input type="hidden" name="action" value="cancel" />
+					<button type="submit" class="btn-danger">{copy.cancelBtn}</button>
+				</form>
+			)}
+		</div>
+	</div>
+
+	<div class="letterhead">
+		<div class="letterhead__top">
+			<div>
+				<p class="letterhead__brand">{property.brand}</p>
+				<p class="letterhead__sub">{property.propertyName} · {property.city}, {property.countryName}</p>
+			</div>
+			<div class="letterhead__invoice-meta">
+				<p class="invoice-title">INVOICE</p>
+				<p class="invoice-number">{invoice.invoiceNumber}</p>
+				<span class={`status-badge ${invoice.status === 'paid' ? 'status-badge--active' : invoice.status === 'cancelled' ? 'status-badge--cancelled' : ''}`}>
+					{statusLabels[invoice.status] ?? invoice.status}
+				</span>
+			</div>
+		</div>
+
+		<div class="letterhead__parties">
+			<div>
+				<p class="party-label">{copy.payer}</p>
+				<p class="party-name">{property.payerName}</p>
+				<p>{property.payerAddress}</p>
+				<p>{copy.reference}: {property.legalEntityRegCode} · VAT {property.legalEntityVat}</p>
+				<p>{copy.iban}: {property.payerIban}</p>
+				<p>{copy.bic}: {property.payerBic}</p>
+			</div>
+			<div>
+				<p class="party-label">{copy.billTo}</p>
+				<p class="party-name">{invoice.billToName}</p>
+				{invoice.billToAddress && <p>{invoice.billToAddress}</p>}
+				{invoice.billToRegCode && <p>{copy.reference}: {invoice.billToRegCode}</p>}
+				{invoice.billToVat && <p>VAT {invoice.billToVat}</p>}
+			</div>
+		</div>
+
+		<div class="letterhead__dates">
+			<div>
+				<span>{copy.issueDate}</span>
+				<strong>{invoice.issueDate}</strong>
+			</div>
+			{invoice.dueDate && (
+				<div>
+					<span>{copy.dueDate}</span>
+					<strong>{invoice.dueDate}</strong>
+				</div>
+			)}
+		</div>
+
+		<table class="letterhead__lines">
+			<thead>
+				<tr>
+					<th>{copy.descriptionLabel}</th>
+					<th class="num">{copy.amountExclVat}</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr>
+					<td>
+						{copy.descriptionText}
+						{bk && (
+							<>
+								— {roomTitle()}, {bk.checkIn} → {bk.checkOut}
+							</>
+						)}
+					</td>
+					<td class="num">{euro(invoice.amountExclVatCents)}</td>
+				</tr>
+			</tbody>
+		</table>
+
+		<div class="letterhead__totals">
+			<div>
+				<span>{copy.amountExclVat}</span>
+				<span>{euro(invoice.amountExclVatCents)}</span>
+			</div>
+			<div>
+				<span>
+					{copy.vatLabel} ({vatRatePercent}%)
+				</span>
+				<span>{euro(invoice.vatCents)}</span>
+			</div>
+			<div class="total-row">
+				<span>{copy.amountTotal}</span>
+				<span>{euro(invoice.amountTotalCents)}</span>
+			</div>
+		</div>
+	</div>
+
+	<style>
+		.back-link {
+			display: inline-block;
+			margin-bottom: 0.75rem;
+			font-size: 0.82rem;
+			color: var(--text-dark-muted);
+			text-decoration: none;
+		}
+
+		.back-link:hover {
+			color: var(--accent);
+		}
+
+		.actions-row {
+			display: flex;
+			gap: 0.6rem;
+			margin-bottom: 1.5rem;
+		}
+
+		.btn-secondary,
+		.btn-danger {
+			font: inherit;
+			font-size: 0.82rem;
+			font-weight: 700;
+			padding: 0.55rem 1rem;
+			border-radius: 0.5rem;
+			cursor: pointer;
+		}
+
+		.btn-secondary {
+			border: none;
+			background: var(--bg-dark);
+			color: var(--cream);
+		}
+
+		.btn-danger {
+			border: 1px solid rgba(179, 67, 47, 0.4);
+			background: #fff;
+			color: var(--danger);
+		}
+
+		.letterhead {
+			max-width: 40rem;
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			padding: 2.5rem;
+			font-size: 0.88rem;
+			color: var(--text-dark);
+		}
+
+		.letterhead__top {
+			display: flex;
+			justify-content: space-between;
+			align-items: flex-start;
+			padding-bottom: 1.5rem;
+			border-bottom: 2px solid var(--bg-dark);
+			margin-bottom: 1.75rem;
+		}
+
+		.letterhead__brand {
+			margin: 0;
+			font-family: var(--font-display, serif);
+			font-size: 1.3rem;
+			font-weight: 700;
+		}
+
+		.letterhead__sub {
+			margin: 0.2rem 0 0;
+			font-size: 0.8rem;
+			color: var(--text-dark-muted);
+		}
+
+		.letterhead__invoice-meta {
+			text-align: right;
+		}
+
+		.invoice-title {
+			margin: 0;
+			font-size: 0.75rem;
+			letter-spacing: 0.1em;
+			color: var(--text-dark-muted);
+		}
+
+		.invoice-number {
+			margin: 0.2rem 0 0.5rem;
+			font-size: 1.1rem;
+			font-weight: 800;
+		}
+
+		.letterhead__parties {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 1.5rem;
+			margin-bottom: 1.5rem;
+		}
+
+		.letterhead__parties p {
+			margin: 0 0 0.2rem;
+		}
+
+		.party-label {
+			font-size: 0.72rem;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			color: var(--text-dark-muted);
+			margin-bottom: 0.4rem !important;
+		}
+
+		.party-name {
+			font-weight: 700;
+		}
+
+		.letterhead__dates {
+			display: flex;
+			gap: 2rem;
+			padding: 0.9rem 0;
+			border-top: 1px solid var(--border-light);
+			border-bottom: 1px solid var(--border-light);
+			margin-bottom: 1.5rem;
+			font-size: 0.82rem;
+		}
+
+		.letterhead__dates div {
+			display: flex;
+			flex-direction: column;
+			gap: 0.2rem;
+		}
+
+		.letterhead__dates span {
+			color: var(--text-dark-muted);
+			font-size: 0.75rem;
+		}
+
+		.letterhead__lines {
+			width: 100%;
+			border-collapse: collapse;
+			margin-bottom: 1.25rem;
+		}
+
+		.letterhead__lines th {
+			text-align: left;
+			font-size: 0.72rem;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			color: var(--text-dark-muted);
+			border-bottom: 1px solid var(--border-light);
+			padding: 0 0 0.5rem;
+		}
+
+		.letterhead__lines td {
+			padding: 0.6rem 0;
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		.num {
+			text-align: right;
+		}
+
+		.letterhead__totals {
+			display: flex;
+			flex-direction: column;
+			gap: 0.4rem;
+			max-width: 16rem;
+			margin-left: auto;
+		}
+
+		.letterhead__totals div {
+			display: flex;
+			justify-content: space-between;
+			font-size: 0.85rem;
+		}
+
+		.total-row {
+			border-top: 1px solid var(--text-dark);
+			padding-top: 0.5rem;
+			font-weight: 800;
+			font-size: 1rem !important;
+		}
+
+		.status-badge {
+			display: inline-block;
+			border-radius: 999px;
+			padding: 0.2rem 0.7rem;
+			font-size: 0.7rem;
+			font-weight: 700;
+			background: var(--border-light);
+			color: var(--text-dark-muted);
+		}
+
+		.status-badge--active {
+			background: rgba(63, 122, 79, 0.12);
+			color: var(--success);
+		}
+
+		.status-badge--cancelled {
+			background: rgba(179, 67, 47, 0.12);
+			color: var(--danger);
+		}
+
+		@media print {
+			.no-print {
+				display: none;
+			}
+
+			.letterhead {
+				border: none;
+				padding: 0;
+			}
+		}
+	</style>
+</AdminLayout>

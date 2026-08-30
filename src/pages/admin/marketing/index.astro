@@ -1,0 +1,260 @@
+---
+// Розсилки (Фаза 5, ТЗ §5.5 "HTML-розсилки клієнтам") — ручна розсилка
+// адміном усім гостям з marketingConsent=true. Синхронно в межах одного
+// запиту (обсяг бази малий) — без черги/зовнішнього сервісу.
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../db/client';
+import { admins, guests, marketingCampaigns } from '../../../db/schema';
+import { eq, desc } from 'drizzle-orm';
+import { getAdminLocale, admin as adminCopy } from '../../../i18n/admin';
+import { renderEmailHtml } from '../../../lib/emailTemplate';
+import { sendMail } from '../../../lib/mailer';
+
+export const prerender = false;
+
+const adminId = await Astro.session?.get('adminId');
+if (!adminId) {
+	return Astro.redirect('/admin/login');
+}
+const currentAdmin = db.select().from(admins).where(eq(admins.id, adminId)).get();
+if (!currentAdmin) {
+	return Astro.redirect('/admin/login');
+}
+
+const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = adminCopy[locale].marketingComposer;
+
+let error = '';
+let notice = '';
+let values = { subject: '', body: '' };
+
+if (Astro.request.method === 'POST') {
+	const form = await Astro.request.formData();
+	const subject = String(form.get('subject') || '').trim();
+	const body = String(form.get('body') || '').trim();
+	values = { subject, body };
+
+	if (!subject || !body) {
+		error = copy.errorRequired;
+	} else {
+		const recipients = db.select().from(guests).where(eq(guests.marketingConsent, true)).all();
+		if (recipients.length === 0) {
+			error = copy.errorNoRecipients;
+		} else {
+			const bodyHtml = body
+				.split(/\n{2,}/)
+				.map((para) => `<p style="margin:0 0 1rem;">${para.replace(/\n/g, '<br />')}</p>`)
+				.join('');
+			const html = renderEmailHtml({ heading: subject, bodyHtml });
+
+			let sent = 0;
+			for (const g of recipients) {
+				try {
+					await sendMail(g.email, subject, html);
+					sent++;
+				} catch {
+					// один провал не має зупиняти всю розсилку — лічильник sent
+					// покаже реальну кількість доставлених
+				}
+			}
+
+			db.insert(marketingCampaigns).values({ subject, bodyHtml, recipientCount: sent, sentByAdminId: adminId }).run();
+			notice = `${copy.sentNotice} (${sent}/${recipients.length})`;
+			values = { subject: '', body: '' };
+		}
+	}
+}
+
+const history = db.select().from(marketingCampaigns).orderBy(desc(marketingCampaigns.createdAt)).all();
+const recipientCount = db.select().from(guests).where(eq(guests.marketingConsent, true)).all().length;
+---
+
+<AdminLayout title={copy.title} adminName={currentAdmin.fullName} activeNav="marketing">
+	<h1>{copy.title}</h1>
+	<p class="page-subtitle">{copy.subtitle}</p>
+
+	{notice && <p class="notice notice--success">{notice}</p>}
+	{error && <p class="notice notice--error">{error}</p>}
+
+	<form method="POST" class="composer-form">
+		<label>
+			{copy.subject}
+			<input type="text" name="subject" required placeholder={copy.subjectPlaceholder} value={values.subject} />
+		</label>
+		<label>
+			{copy.body}
+			<textarea name="body" rows="8" required placeholder={copy.bodyPlaceholder}>{values.body}</textarea>
+		</label>
+		<p class="field-note">{copy.bodyHint}</p>
+		<p class="recipients-note">
+			{copy.recipientsNote} ({recipientCount})
+		</p>
+		<button type="submit" class="btn-primary">{copy.sendBtn}</button>
+	</form>
+
+	<section class="history">
+		<h2>{copy.historyTitle}</h2>
+		{
+			history.length === 0 ? (
+				<p class="empty-note">{copy.empty}</p>
+			) : (
+				<div class="table-wrap">
+					<table>
+						<thead>
+							<tr>
+								<th>{copy.colSubject}</th>
+								<th>{copy.colRecipients}</th>
+								<th>{copy.colDate}</th>
+							</tr>
+						</thead>
+						<tbody>
+							{history.map((c) => (
+								<tr>
+									<td>{c.subject}</td>
+									<td>{c.recipientCount}</td>
+									<td class="mono">{c.createdAt}</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			)
+		}
+	</section>
+
+	<style>
+		h1 {
+			margin: 0;
+			font-size: 1.4rem;
+			font-weight: 700;
+		}
+
+		.page-subtitle {
+			margin: 0 0 1.25rem;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+			max-width: 40rem;
+		}
+
+		.notice {
+			border-radius: 0.6rem;
+			padding: 0.65rem 0.9rem;
+			margin: 0 0 1rem;
+			font-size: 0.85rem;
+			max-width: 34rem;
+		}
+
+		.notice--success {
+			background: rgba(63, 122, 79, 0.1);
+			color: var(--success);
+			border: 1px solid rgba(63, 122, 79, 0.3);
+		}
+
+		.notice--error {
+			background: rgba(179, 67, 47, 0.1);
+			color: var(--danger);
+			border: 1px solid rgba(179, 67, 47, 0.3);
+		}
+
+		.composer-form {
+			display: flex;
+			flex-direction: column;
+			gap: 1rem;
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			padding: 1.5rem;
+			max-width: 34rem;
+			margin-bottom: 2rem;
+		}
+
+		.composer-form label {
+			display: flex;
+			flex-direction: column;
+			gap: 0.35rem;
+			font-size: 0.85rem;
+			font-weight: 600;
+			color: var(--text-dark);
+		}
+
+		.composer-form input,
+		.composer-form textarea {
+			font: inherit;
+			font-weight: 400;
+			padding: 0.6rem 0.75rem;
+			border-radius: 0.5rem;
+			border: 1px solid var(--border-light);
+			background: #fff;
+			color: var(--text-dark);
+			resize: vertical;
+		}
+
+		.field-note,
+		.recipients-note {
+			margin: -0.5rem 0 0;
+			font-size: 0.78rem;
+			color: var(--text-dark-muted);
+		}
+
+		.btn-primary {
+			align-self: flex-start;
+			font: inherit;
+			font-size: 0.85rem;
+			font-weight: 700;
+			padding: 0.6rem 1.2rem;
+			border-radius: 0.5rem;
+			border: none;
+			background: var(--bg-dark);
+			color: var(--cream);
+			cursor: pointer;
+		}
+
+		.history h2 {
+			font-size: 1.1rem;
+			margin: 0 0 1rem;
+		}
+
+		.empty-note {
+			color: var(--text-dark-muted);
+			font-size: 0.88rem;
+		}
+
+		.table-wrap {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			overflow-x: auto;
+			max-width: 34rem;
+		}
+
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 0.85rem;
+		}
+
+		th,
+		td {
+			text-align: left;
+			padding: 0.65rem 1rem;
+			vertical-align: middle;
+		}
+
+		.mono {
+			font-size: 0.78rem;
+			color: var(--text-dark-muted);
+		}
+
+		thead th {
+			font-size: 0.72rem;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			color: var(--text-dark-muted);
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		tbody tr:not(:last-child) td {
+			border-bottom: 1px solid var(--border-light);
+		}
+	</style>
+</AdminLayout>

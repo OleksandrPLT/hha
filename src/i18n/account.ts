@@ -33,6 +33,10 @@ export interface AccountCopy {
 		errorPasswordMismatch: string;
 		errorConsentRequired: string;
 		errorGeneric: string;
+		verifyEmailSubject: string;
+		verifyEmailHeading: string;
+		verifyEmailBody: string;
+		verifyEmailCta: string;
 	};
 	login: {
 		title: string;
@@ -165,6 +169,10 @@ export const account: Record<Locale, AccountCopy> = {
 			errorPasswordMismatch: "Passwords don't match.",
 			errorConsentRequired: 'Please agree to the processing of your personal data to continue.',
 			errorGeneric: 'Something went wrong. Please try again.',
+			verifyEmailSubject: 'Confirm your email — Hostel 3A',
+			verifyEmailHeading: 'Confirm your email address',
+			verifyEmailBody: 'Please confirm your email to finish setting up your account.',
+			verifyEmailCta: 'Confirm email',
 		},
 		login: {
 			title: 'Sign in',
@@ -298,6 +306,10 @@ export const account: Record<Locale, AccountCopy> = {
 			errorPasswordMismatch: 'Paroolid ei kattu.',
 			errorConsentRequired: 'Jätkamiseks nõustu oma isikuandmete töötlemisega.',
 			errorGeneric: 'Midagi läks valesti. Palun proovi uuesti.',
+			verifyEmailSubject: 'Kinnita oma e-post — Hostel 3A',
+			verifyEmailHeading: 'Kinnita oma e-posti aadress',
+			verifyEmailBody: 'Palun kinnita oma e-post, et lõpetada konto seadistamine.',
+			verifyEmailCta: 'Kinnita e-post',
 		},
 		login: {
 			title: 'Logi sisse',
@@ -431,6 +443,10 @@ export const account: Record<Locale, AccountCopy> = {
 			errorPasswordMismatch: 'Паролі не збігаються.',
 			errorConsentRequired: 'Щоб продовжити, погодьтесь на обробку персональних даних.',
 			errorGeneric: 'Щось пішло не так. Спробуйте ще раз.',
+			verifyEmailSubject: 'Підтвердіть email — Hostel 3A',
+			verifyEmailHeading: 'Підтвердіть вашу email-адресу',
+			verifyEmailBody: 'Підтвердіть, будь ласка, свій email, щоб завершити налаштування акаунта.',
+			verifyEmailCta: 'Підтвердити email',
 		},
 		login: {
 			title: 'Увійти',
@@ -564,6 +580,10 @@ export const account: Record<Locale, AccountCopy> = {
 			errorPasswordMismatch: 'Пароли не совпадают.',
 			errorConsentRequired: 'Чтобы продолжить, согласитесь на обработку персональных данных.',
 			errorGeneric: 'Что-то пошло не так. Попробуйте ещё раз.',
+			verifyEmailSubject: 'Подтвердите email — Hostel 3A',
+			verifyEmailHeading: 'Подтвердите вашу email-адрес',
+			verifyEmailBody: 'Подтвердите, пожалуйста, свой email, чтобы завершить настройку аккаунта.',
+			verifyEmailCta: 'Подтвердить email',
 		},
 		login: {
 			title: 'Войти',
@@ -697,6 +717,10 @@ export const account: Record<Locale, AccountCopy> = {
 			errorPasswordMismatch: 'Paroles nesakrīt.',
 			errorConsentRequired: 'Lai turpinātu, lūdzu, piekrītiet savu personas datu apstrādei.',
 			errorGeneric: 'Kaut kas nogāja greizi. Lūdzu, mēģiniet vēlreiz.',
+			verifyEmailSubject: 'Apstiprini savu e-pastu — Hostel 3A',
+			verifyEmailHeading: 'Apstiprini savu e-pasta adresi',
+			verifyEmailBody: 'Lūdzu, apstiprini savu e-pastu, lai pabeigtu konta iestatīšanu.',
+			verifyEmailCta: 'Apstiprināt e-pastu',
 		},
 		login: {
 			title: 'Ienākt',
@@ -830,6 +854,10 @@ export const account: Record<Locale, AccountCopy> = {
 			errorPasswordMismatch: 'Salasanat eivät täsmää.',
 			errorConsentRequired: 'Jatkaaksesi hyväksy henkilötietojesi käsittely.',
 			errorGeneric: 'Jokin meni pieleen. Yritä uudelleen.',
+			verifyEmailSubject: 'Vahvista sähköpostisi — Hostel 3A',
+			verifyEmailHeading: 'Vahvista sähköpostiosoitteesi',
+			verifyEmailBody: 'Vahvista sähköpostisi viimeistelläksesi tilin asetukset.',
+			verifyEmailCta: 'Vahvista sähköposti',
 		},
 		login: {
 			title: 'Kirjaudu',

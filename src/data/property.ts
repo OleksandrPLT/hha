@@ -38,4 +38,12 @@ export const property = {
 	legalEntityRegCode: '10049852',
 	legalEntityVat: 'EE100194913',
 	legalEntityAddress: 'Toom-Kooli tn 7, Tallinn 10130, Estonia',
+	// Платіжні реквізити для інвойсів (Фаза 5, надано користувачем 2026-08-30
+	// напряму в чат — реальний Revolut Business рахунок). Використовується
+	// ЛИШЕ на бланку інвойсу (src/pages/admin/invoices/[id].astro), ніде
+	// більше на публічному сайті.
+	payerName: 'P&G GRUPP AS',
+	payerIban: 'LT983250097254168860',
+	payerBic: 'REVOLT21XXX',
+	payerAddress: 'EE, Kesklinna linnaosa, Toom-Kooli tn 7, Tallinn, 10130',
 } as const;

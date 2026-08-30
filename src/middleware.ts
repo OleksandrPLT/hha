@@ -13,6 +13,12 @@ import 'dotenv/config';
 import { defineMiddleware } from 'astro:middleware';
 import { detectLocaleFromPath, renderComingSoonPage } from './lib/comingSoonPage';
 import { pickLocaleFromAcceptLanguage } from './i18n/locales';
+// Побічний ефект: запускає setInterval для автоматичних тригерних листів
+// (нагадування/подяка, Фаза 5). Модулі кешуються Node — import виконується
+// рівно один раз за життя процесу, незалежно від кількості запитів, тому
+// це безпечний спосіб отримати "щось, що стартує один раз при запуску
+// сервера" без окремого entrypoint/cron (яких на Zone.ee немає).
+import './lib/scheduler';
 
 const PREVIEW_COOKIE = 'hha_preview';
 

@@ -8,13 +8,14 @@
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import BookingSourceIcon from '../../../components/BookingSourceIcon.astro';
 import { db } from '../../../db/client';
-import { admins, bookings, rooms, guests, guestNotes } from '../../../db/schema';
+import { admins, bookings, rooms, guests, guestNotes, invoices } from '../../../db/schema';
 import { eq } from 'drizzle-orm';
 import { getAdminLocale, admin as adminCopy } from '../../../i18n/admin';
 import { booking as bookingCopy } from '../../../i18n/booking';
 import { currency } from '../../../data/pricing';
 import { pointsForStay } from '../../../data/loyalty';
 import { isRevolutConfigured } from '../../../lib/revolut';
+import { nextInvoiceNumber, splitVat } from '../../../lib/invoice';
 
 export const prerender = false;
 
@@ -50,6 +51,31 @@ if (Astro.request.method === 'POST') {
 	if (action === 'mark-paid') {
 		db.update(bookings).set({ paymentStatus: 'paid' }).where(eq(bookings.id, bookingId)).run();
 		notice = copy.notice;
+	} else if (action === 'generate-invoice') {
+		const existingInvoice = db.select().from(invoices).where(eq(invoices.bookingId, bookingId)).get();
+		if (!existingInvoice) {
+			const guest = bk.guestId ? db.select().from(guests).where(eq(guests.id, bk.guestId)).get() : undefined;
+			const { exclVatCents, vatCents } = splitVat(bk.totalCents);
+			const billToName = guest?.isCompany && guest.companyName ? guest.companyName : bk.fullName;
+			db.insert(invoices)
+				.values({
+					bookingId,
+					organizationId: guest?.organizationId ?? null,
+					invoiceNumber: nextInvoiceNumber(),
+					issueDate: new Date().toISOString().slice(0, 10),
+					billToName,
+					billToAddress: guest?.isCompany ? guest.companyAddress : null,
+					billToRegCode: guest?.isCompany ? guest.companyRegCode : null,
+					billToVat: guest?.isCompany ? guest.companyVat : null,
+					amountExclVatCents: exclVatCents,
+					vatCents,
+					amountTotalCents: bk.totalCents,
+					createdByAdminId: adminId,
+				})
+				.run();
+			const created = db.select().from(invoices).where(eq(invoices.bookingId, bookingId)).get();
+			if (created) return Astro.redirect(`/admin/invoices/${created.id}`);
+		}
 	} else if (action === 'set-status') {
 		const newStatus = String(form.get('status') || '');
 		if (['pending', 'confirmed', 'cancelled', 'completed'].includes(newStatus)) {
@@ -89,6 +115,7 @@ function roomTitle(): string {
 	}
 }
 const linkedGuest = bk.guestId ? db.select().from(guests).where(eq(guests.id, bk.guestId)).get() : undefined;
+const existingInvoice = db.select().from(invoices).where(eq(invoices.bookingId, bookingId)).get();
 
 const statusLabels: Record<string, string> = {
 	pending: listCopy.statusPending,
@@ -172,6 +199,14 @@ const bookingPageCopy = bookingCopy[locale].page;
 				<div><dt>{copy.pricePerNight}</dt><dd>{euro(bk.pricePerNightCents)}</dd></div>
 				<div><dt>{copy.total}</dt><dd><strong>{euro(bk.totalCents)}</strong></dd></div>
 			</dl>
+			{existingInvoice ? (
+				<a href={`/admin/invoices/${existingInvoice.id}`} class="btn-secondary invoice-link">{existingInvoice.invoiceNumber}</a>
+			) : (
+				<form method="POST">
+					<input type="hidden" name="action" value="generate-invoice" />
+					<button type="submit" class="btn-secondary">{adminCopy[locale].bookingGenerateInvoice.btn}</button>
+				</form>
+			)}
 			{bk.paymentStatus !== 'paid' && (
 				<form method="POST">
 					<input type="hidden" name="action" value="mark-paid" />
@@ -380,6 +415,13 @@ const bookingPageCopy = bookingCopy[locale].page;
 
 		.btn-revolut {
 			background: #0666eb;
+		}
+
+		.invoice-link {
+			display: block;
+			text-align: center;
+			text-decoration: none;
+			font-weight: 700;
 		}
 
 		.status-actions {

@@ -29,6 +29,15 @@ export const guests = sqliteTable('guests', {
 	companyVat: text('company_vat'),
 	companyAddress: text('company_address'),
 
+	// Прив'язка до організації (2026-08-30, "возможность привязать профиль
+	// к организации") — на відміну від companyName/companyRegCode вище
+	// (дані компанії, продубльовані на КОЖНОМУ гостьовому акаунті),
+	// organizationId веде на ОДИН спільний запис, який може бути в кількох
+	// гостей одразу (напр. кілька співробітників однієї компанії) —
+	// дедуплікується по regCode при збереженні (organizations.regCode
+	// unique), див. src/pages/[locale]/account/edit.astro.
+	organizationId: integer('organization_id').references(() => organizations.id, { onDelete: 'set null' }),
+
 	// Розширений профіль — усе нижче необов'язкове на рівні БД.
 	nationality: text('nationality'),
 	dateOfBirth: text('date_of_birth'),
@@ -64,11 +73,18 @@ export const guests = sqliteTable('guests', {
 	googleId: text('google_id').unique(),
 	telegramId: text('telegram_id').unique(),
 
-	// Відновлення пароля. Email ще не підключено (немає SMTP) — посилання
-	// поки просто показуємо на екрані замість листа, див.
-	// src/pages/[locale]/account/forgot-password.astro.
+	// Відновлення пароля — SMTP підключено (див. src/lib/mailer.ts),
+	// посилання йде реальним листом.
 	resetToken: text('reset_token'),
 	resetTokenExpiresAt: text('reset_token_expires_at'),
+
+	// Підтвердження email (Фаза 5, 2026-08-30) — "м'яка" верифікація: не
+	// блокує вхід/бронювання, лише позначає акаунт як підтверджений
+	// (видно в адмінці, і на майбутнє — можна буде вимагати для певних дій).
+	// OAuth/Telegram-акаунти вважаються підтвердженими одразу (email прийшов
+	// від довіреного провайдера, окрема верифікація не потрібна).
+	emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
+	emailVerificationToken: text('email_verification_token'),
 
 	createdAt: text('created_at')
 		.notNull()
@@ -226,6 +242,11 @@ export const bookings = sqliteTable('bookings', {
 	// звернувся не через сайт). За проханням користувача 2026-08-30.
 	source: text('source').notNull().default('website'),
 
+	// Мова, якою гість оформив бронювання (2026-08-30) — щоб автоматичні
+	// листи (оплата підтверджена, нагадування, подяка) йшли ту ж мовою, що
+	// й початкове підтвердження, а не завжди англійською "за замовчуванням".
+	locale: text('locale').notNull().default('en'),
+
 	checkIn: text('check_in').notNull(),
 	checkOut: text('check_out').notNull(),
 	nights: integer('nights').notNull(),
@@ -257,6 +278,13 @@ export const bookings = sqliteTable('bookings', {
 	specialRequests: text('special_requests'),
 
 	pointsAwarded: integer('points_awarded', { mode: 'boolean' }).notNull().default(false),
+
+	// Автоматичні тригерні листи (Фаза 5, 2026-08-30 — "нагадування,
+	// подяка після виїзду"), надсилає src/lib/scheduler.ts. Часові мітки,
+	// не boolean — щоб бачити КОЛИ надіслано (діагностика), і як прапорець
+	// "не надсилати вдруге".
+	reminderSentAt: text('reminder_sent_at'),
+	thankYouSentAt: text('thank_you_sent_at'),
 
 	createdAt: text('created_at')
 		.notNull()
@@ -407,3 +435,74 @@ export const promotions = sqliteTable('promotions', {
 
 export type Promotion = typeof promotions.$inferSelect;
 export type NewPromotion = typeof promotions.$inferInsert;
+
+// Історія маркетингових розсилок (Фаза 5, 2026-08-30) — адмін пише
+// тему+текст, надсилаємо одразу (синхронно в тому ж запиті) усім гостям
+// з marketingConsent=true. Без черги/зовнішнього сервісу розсилок —
+// об'єм бази гостей малий, синхронного надсилання в межах одного запиту
+// достатньо; recipientCount — знімок на момент відправки (скільки
+// реально отримали).
+export const marketingCampaigns = sqliteTable('marketing_campaigns', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	subject: text('subject').notNull(),
+	bodyHtml: text('body_html').notNull(),
+	recipientCount: integer('recipient_count').notNull().default(0),
+	sentByAdminId: integer('sent_by_admin_id').references(() => admins.id),
+	createdAt: text('created_at')
+		.notNull()
+		.default(sql`(current_timestamp)`),
+});
+
+export type MarketingCampaign = typeof marketingCampaigns.$inferSelect;
+export type NewMarketingCampaign = typeof marketingCampaigns.$inferInsert;
+
+// Організації (2026-08-30) — спільний запис компанії, до якого можуть
+// прив'язатись кілька гостьових акаунтів (guests.organizationId). regCode
+// unique — природний ключ для дедуплікації: якщо гість вказує вже відомий
+// реєстраційний код, прив'язуємо до існуючого запису замість дублювання.
+export const organizations = sqliteTable('organizations', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	name: text('name').notNull(),
+	regCode: text('reg_code').unique(),
+	vat: text('vat'),
+	address: text('address'),
+	createdAt: text('created_at')
+		.notNull()
+		.default(sql`(current_timestamp)`),
+});
+
+export type Organization = typeof organizations.$inferSelect;
+export type NewOrganization = typeof organizations.$inferInsert;
+
+// Інвойси (2026-08-30, "инвойсы данные компании ... должен быть на
+// фирменом бланке") — прив'язані до конкретного бронювання, дані
+// одержувача (bill-to) — знімок на момент видачі (щоб пізніша зміна
+// профілю гостя/організації не міняла заднім числом вже видані інвойси).
+// Платіжні реквізити відправника (P&G Grupp AS, IBAN/BIC) — статичні,
+// беруться напряму з src/data/property.ts на бланку, в таблиці не
+// дублюються.
+export const invoices = sqliteTable('invoices', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	bookingId: integer('booking_id')
+		.notNull()
+		.references(() => bookings.id, { onDelete: 'cascade' }),
+	organizationId: integer('organization_id').references(() => organizations.id),
+	invoiceNumber: text('invoice_number').notNull().unique(),
+	issueDate: text('issue_date').notNull(),
+	dueDate: text('due_date'),
+	billToName: text('bill_to_name').notNull(),
+	billToAddress: text('bill_to_address'),
+	billToRegCode: text('bill_to_reg_code'),
+	billToVat: text('bill_to_vat'),
+	amountExclVatCents: integer('amount_excl_vat_cents').notNull(),
+	vatCents: integer('vat_cents').notNull(),
+	amountTotalCents: integer('amount_total_cents').notNull(),
+	status: text('status').notNull().default('issued'),
+	createdByAdminId: integer('created_by_admin_id').references(() => admins.id),
+	createdAt: text('created_at')
+		.notNull()
+		.default(sql`(current_timestamp)`),
+});
+
+export type Invoice = typeof invoices.$inferSelect;
+export type NewInvoice = typeof invoices.$inferInsert;

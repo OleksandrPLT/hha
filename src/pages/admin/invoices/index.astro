@@ -1,0 +1,156 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../db/client';
+import { admins, invoices } from '../../../db/schema';
+import { eq, desc } from 'drizzle-orm';
+import { getAdminLocale, admin as adminCopy } from '../../../i18n/admin';
+import { currency } from '../../../data/pricing';
+
+export const prerender = false;
+
+const adminId = await Astro.session?.get('adminId');
+if (!adminId) {
+	return Astro.redirect('/admin/login');
+}
+const currentAdmin = db.select().from(admins).where(eq(admins.id, adminId)).get();
+if (!currentAdmin) {
+	return Astro.redirect('/admin/login');
+}
+
+const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = adminCopy[locale].invoicesList;
+
+const allInvoices = db.select().from(invoices).orderBy(desc(invoices.createdAt)).all();
+
+const statusLabels: Record<string, string> = {
+	issued: copy.statusIssued,
+	paid: copy.statusPaid,
+	cancelled: copy.statusCancelled,
+};
+---
+
+<AdminLayout title={copy.title} adminName={currentAdmin.fullName} activeNav="invoices">
+	<h1>{copy.title}</h1>
+	<p class="page-subtitle">{copy.subtitle}</p>
+
+	{
+		allInvoices.length === 0 ? (
+			<p class="empty-note">{copy.empty}</p>
+		) : (
+			<div class="table-wrap">
+				<table>
+					<thead>
+						<tr>
+							<th>{copy.colNumber}</th>
+							<th>{copy.colBillTo}</th>
+							<th>{copy.colAmount}</th>
+							<th>{copy.colDate}</th>
+							<th>{copy.colStatus}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{allInvoices.map((inv) => (
+							<tr>
+								<td><a href={`/admin/invoices/${inv.id}`}>{inv.invoiceNumber}</a></td>
+								<td>{inv.billToName}</td>
+								<td>
+									{currency}
+									{(inv.amountTotalCents / 100).toFixed(2)}
+								</td>
+								<td class="mono">{inv.issueDate}</td>
+								<td><span class={`status-badge ${inv.status === 'paid' ? 'status-badge--active' : inv.status === 'cancelled' ? 'status-badge--cancelled' : ''}`}>{statusLabels[inv.status] ?? inv.status}</span></td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+		)
+	}
+
+	<style>
+		h1 {
+			margin: 0;
+			font-size: 1.4rem;
+			font-weight: 700;
+		}
+
+		.page-subtitle {
+			margin: 0 0 1.25rem;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+			max-width: 40rem;
+		}
+
+		.empty-note {
+			color: var(--text-dark-muted);
+			font-size: 0.88rem;
+		}
+
+		.table-wrap {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			overflow-x: auto;
+		}
+
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 0.85rem;
+		}
+
+		th,
+		td {
+			text-align: left;
+			padding: 0.65rem 1rem;
+			white-space: nowrap;
+			vertical-align: middle;
+		}
+
+		.mono {
+			font-size: 0.78rem;
+			color: var(--text-dark-muted);
+		}
+
+		thead th {
+			font-size: 0.72rem;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			color: var(--text-dark-muted);
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		tbody tr:not(:last-child) td {
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		tbody a {
+			color: var(--accent);
+			font-weight: 600;
+			text-decoration: none;
+		}
+
+		tbody a:hover {
+			text-decoration: underline;
+		}
+
+		.status-badge {
+			border-radius: 999px;
+			padding: 0.25rem 0.7rem;
+			font-size: 0.72rem;
+			font-weight: 700;
+			background: var(--border-light);
+			color: var(--text-dark-muted);
+		}
+
+		.status-badge--active {
+			background: rgba(63, 122, 79, 0.12);
+			color: var(--success);
+		}
+
+		.status-badge--cancelled {
+			background: rgba(179, 67, 47, 0.12);
+			color: var(--danger);
+		}
+	</style>
+</AdminLayout>

@@ -1,0 +1,100 @@
+---
+// Підтвердження email (Фаза 5, 2026-08-30) — "м'яка" верифікація: не
+// блокує нічого, лише позначає акаунт підтвердженим. Токен одноразовий —
+// одразу очищається після використання.
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import SiteHeader from '../../../components/SiteHeader.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import { isLocale, defaultLocale, type Locale } from '../../../i18n/locales';
+import { account } from '../../../i18n/account';
+import { db } from '../../../db/client';
+import { guests } from '../../../db/schema';
+import { eq } from 'drizzle-orm';
+import { formatMemberId } from '../../../lib/memberCard';
+
+export const prerender = false;
+
+const rawLocale = Astro.params.locale;
+if (!rawLocale || !isLocale(rawLocale)) {
+	return Astro.redirect(`/${defaultLocale}`);
+}
+const locale: Locale = rawLocale;
+const copy = account[locale].register;
+
+const token = Astro.url.searchParams.get('token') || '';
+const guest = token ? db.select().from(guests).where(eq(guests.emailVerificationToken, token)).get() : undefined;
+
+let success = false;
+let memberId = '';
+if (guest) {
+	db.update(guests).set({ emailVerified: true, emailVerificationToken: null }).where(eq(guests.id, guest.id)).run();
+	success = true;
+	memberId = formatMemberId(guest.id);
+}
+---
+
+<BaseLayout locale={locale} title={copy.verifyEmailHeading} description={copy.verifyEmailBody} path="/account/verify-email">
+	<SiteHeader locale={locale} />
+	<main class="verify-page">
+		<div class="container">
+			<div class="verify-card">
+				{
+					success ? (
+						<>
+							<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#2e7d4f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+								<circle cx="12" cy="12" r="10" />
+								<path d="M8 12l3 3 5-6" />
+							</svg>
+							<h1>{copy.verifyEmailHeading}</h1>
+							<p>{copy.verifyEmailBody}</p>
+							<a href={`/${locale}/account/${memberId}`} class="btn">→</a>
+						</>
+					) : (
+						<h1>{copy.errorGeneric}</h1>
+					)
+				}
+			</div>
+		</div>
+	</main>
+	<SiteFooter locale={locale} />
+
+	<style>
+		.verify-page {
+			background: var(--bg-light);
+			min-height: 60vh;
+			padding: 3rem 0;
+			display: flex;
+			align-items: center;
+		}
+
+		.container {
+			max-width: 28rem;
+			margin: 0 auto;
+			padding: 0 1.25rem;
+		}
+
+		.verify-card {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 1rem;
+			padding: 2.5rem 1.75rem;
+			text-align: center;
+		}
+
+		h1 {
+			margin: 0.75rem 0 0.5rem;
+			font-size: 1.3rem;
+		}
+
+		.btn {
+			display: inline-flex;
+			margin-top: 1rem;
+			padding: 0.6rem 1.2rem;
+			border-radius: 0.6rem;
+			background: var(--text-dark);
+			color: #fff;
+			text-decoration: none;
+			font-weight: 700;
+		}
+	</style>
+</BaseLayout>

@@ -13,7 +13,20 @@ export function isAdminLocale(value: string | undefined | null): value is AdminL
 }
 
 export interface AdminCopy {
-	nav: { overview: string; rooms: string; bookings: string; guests: string; checkin: string; promotions: string; logout: string; brand: string; brandSub: string };
+	nav: {
+		overview: string;
+		rooms: string;
+		bookings: string;
+		guests: string;
+		checkin: string;
+		promotions: string;
+		invoices: string;
+		organizations: string;
+		marketing: string;
+		logout: string;
+		brand: string;
+		brandSub: string;
+	};
 	login: { title: string; subtitle: string; email: string; password: string; submit: string; errorInvalid: string };
 	overview: {
 		title: string;
@@ -306,11 +319,100 @@ export interface AdminCopy {
 		errorDates: string;
 		savedNotice: string;
 	};
+	organizationsList: {
+		title: string;
+		subtitle: string;
+		empty: string;
+		colName: string;
+		colRegCode: string;
+		colGuests: string;
+	};
+	organizationDetail: {
+		back: string;
+		regCode: string;
+		vat: string;
+		address: string;
+		guestsSection: string;
+		noGuests: string;
+		invoicesSection: string;
+		noInvoices: string;
+	};
+	invoicesList: {
+		title: string;
+		subtitle: string;
+		addBtn: string;
+		empty: string;
+		colNumber: string;
+		colBillTo: string;
+		colAmount: string;
+		colDate: string;
+		colStatus: string;
+		statusIssued: string;
+		statusPaid: string;
+		statusCancelled: string;
+	};
+	invoiceDetail: {
+		back: string;
+		printBtn: string;
+		markPaidBtn: string;
+		cancelBtn: string;
+		confirmCancel: string;
+		billTo: string;
+		payer: string;
+		invoiceNumber: string;
+		issueDate: string;
+		dueDate: string;
+		descriptionLabel: string;
+		descriptionText: string;
+		amountExclVat: string;
+		vatLabel: string;
+		amountTotal: string;
+		iban: string;
+		bic: string;
+		reference: string;
+		statusLabel: string;
+	};
+	bookingGenerateInvoice: {
+		btn: string;
+		alreadyIssued: string;
+	};
+	marketingComposer: {
+		title: string;
+		subtitle: string;
+		subject: string;
+		subjectPlaceholder: string;
+		body: string;
+		bodyPlaceholder: string;
+		bodyHint: string;
+		recipientsNote: string;
+		sendBtn: string;
+		sentNotice: string;
+		historyTitle: string;
+		colSubject: string;
+		colRecipients: string;
+		colDate: string;
+		empty: string;
+		errorRequired: string;
+		errorNoRecipients: string;
+	};
 }
 
 export const admin: Record<AdminLocale, AdminCopy> = {
 	uk: {
-		nav: { overview: 'Огляд', rooms: 'Номери', bookings: 'Бронювання', guests: 'Гості', checkin: 'Картки гостей', promotions: 'Акції', logout: 'Вийти', brand: 'Hostel 3A', brandSub: 'Адмін-панель' },
+		nav: {
+			overview: 'Огляд',
+			rooms: 'Номери',
+			bookings: 'Бронювання',
+			guests: 'Гості',
+			checkin: 'Картки гостей',
+			promotions: 'Акції',
+			invoices: 'Інвойси',
+			organizations: 'Організації',
+			marketing: 'Розсилки',
+			logout: 'Вийти',
+			brand: 'Hostel 3A',
+			brandSub: 'Адмін-панель',
+		},
 		login: {
 			title: 'Адмін-панель',
 			subtitle: 'Hostel & Hotel Apartments',
@@ -610,9 +712,98 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			errorDates: 'Дата "по" має бути пізніше дати "з".',
 			savedNotice: 'Збережено.',
 		},
+		organizationsList: {
+			title: 'Організації',
+			subtitle: 'Компанії, до яких прив\'язані гостьові акаунти.',
+			empty: 'Ще немає жодної організації.',
+			colName: 'Назва',
+			colRegCode: 'Рег. код',
+			colGuests: 'Гостей',
+		},
+		organizationDetail: {
+			back: '← Усі організації',
+			regCode: 'Реєстраційний код',
+			vat: 'VAT',
+			address: 'Адреса',
+			guestsSection: 'Прив\'язані гості',
+			noGuests: 'Ще немає прив\'язаних гостей.',
+			invoicesSection: 'Інвойси',
+			noInvoices: 'Ще немає інвойсів.',
+		},
+		invoicesList: {
+			title: 'Інвойси',
+			subtitle: 'Видані інвойси по бронюваннях.',
+			addBtn: '+ Новий інвойс',
+			empty: 'Ще немає жодного інвойсу.',
+			colNumber: '№',
+			colBillTo: 'Одержувач',
+			colAmount: 'Сума',
+			colDate: 'Дата',
+			colStatus: 'Статус',
+			statusIssued: 'Видано',
+			statusPaid: 'Оплачено',
+			statusCancelled: 'Скасовано',
+		},
+		invoiceDetail: {
+			back: '← Усі інвойси',
+			printBtn: 'Друк / PDF',
+			markPaidBtn: 'Позначити оплаченим',
+			cancelBtn: 'Скасувати інвойс',
+			confirmCancel: 'Скасувати цей інвойс?',
+			billTo: 'Одержувач',
+			payer: 'Реквізити отримувача платежу',
+			invoiceNumber: 'Номер інвойсу',
+			issueDate: 'Дата видачі',
+			dueDate: 'Термін оплати',
+			descriptionLabel: 'Опис',
+			descriptionText: 'Проживання',
+			amountExclVat: 'Сума без ПДВ',
+			vatLabel: 'ПДВ',
+			amountTotal: 'Разом до сплати',
+			iban: 'IBAN',
+			bic: 'BIC',
+			reference: 'Призначення платежу',
+			statusLabel: 'Статус',
+		},
+		bookingGenerateInvoice: {
+			btn: 'Створити інвойс',
+			alreadyIssued: 'Інвойс вже створено',
+		},
+		marketingComposer: {
+			title: 'Розсилки',
+			subtitle: 'Лист усім гостям, що дали згоду на маркетингові розсилки.',
+			subject: 'Тема листа',
+			subjectPlaceholder: 'напр. Знижка -15% на вересень',
+			body: 'Текст листа',
+			bodyPlaceholder: 'Текст повідомлення...',
+			bodyHint: 'Просто текст — переноси рядків стануть абзацами в листі.',
+			recipientsNote: 'Отримають лист лише гості з активною згодою на маркетингові розсилки.',
+			sendBtn: 'Надіслати розсилку',
+			sentNotice: 'Розсилку надіслано.',
+			historyTitle: 'Історія розсилок',
+			colSubject: 'Тема',
+			colRecipients: 'Отримувачів',
+			colDate: 'Дата',
+			empty: 'Ще не було жодної розсилки.',
+			errorRequired: "Заповніть тему і текст листа.",
+			errorNoRecipients: 'Немає жодного гостя зі згодою на маркетингові розсилки.',
+		},
 	},
 	ru: {
-		nav: { overview: 'Обзор', rooms: 'Номера', bookings: 'Бронирования', guests: 'Гости', checkin: 'Карты гостей', promotions: 'Акции', logout: 'Выйти', brand: 'Hostel 3A', brandSub: 'Админ-панель' },
+		nav: {
+			overview: 'Обзор',
+			rooms: 'Номера',
+			bookings: 'Бронирования',
+			guests: 'Гости',
+			checkin: 'Карты гостей',
+			promotions: 'Акции',
+			invoices: 'Инвойсы',
+			organizations: 'Организации',
+			marketing: 'Рассылки',
+			logout: 'Выйти',
+			brand: 'Hostel 3A',
+			brandSub: 'Админ-панель',
+		},
 		login: {
 			title: 'Админ-панель',
 			subtitle: 'Hostel & Hotel Apartments',
@@ -911,6 +1102,82 @@ export const admin: Record<AdminLocale, AdminCopy> = {
 			errorRequired: 'Заполните название, размер скидки и период действия.',
 			errorDates: 'Дата "по" должна быть позже даты "с".',
 			savedNotice: 'Сохранено.',
+		},
+		organizationsList: {
+			title: 'Организации',
+			subtitle: 'Компании, к которым привязаны гостевые аккаунты.',
+			empty: 'Ещё нет ни одной организации.',
+			colName: 'Название',
+			colRegCode: 'Рег. код',
+			colGuests: 'Гостей',
+		},
+		organizationDetail: {
+			back: '← Все организации',
+			regCode: 'Регистрационный код',
+			vat: 'VAT',
+			address: 'Адрес',
+			guestsSection: 'Привязанные гости',
+			noGuests: 'Ещё нет привязанных гостей.',
+			invoicesSection: 'Инвойсы',
+			noInvoices: 'Ещё нет инвойсов.',
+		},
+		invoicesList: {
+			title: 'Инвойсы',
+			subtitle: 'Выданные инвойсы по бронированиям.',
+			addBtn: '+ Новый инвойс',
+			empty: 'Ещё нет ни одного инвойса.',
+			colNumber: '№',
+			colBillTo: 'Получатель',
+			colAmount: 'Сумма',
+			colDate: 'Дата',
+			colStatus: 'Статус',
+			statusIssued: 'Выдан',
+			statusPaid: 'Оплачен',
+			statusCancelled: 'Отменён',
+		},
+		invoiceDetail: {
+			back: '← Все инвойсы',
+			printBtn: 'Печать / PDF',
+			markPaidBtn: 'Отметить оплаченным',
+			cancelBtn: 'Отменить инвойс',
+			confirmCancel: 'Отменить этот инвойс?',
+			billTo: 'Получатель',
+			payer: 'Реквизиты получателя платежа',
+			invoiceNumber: 'Номер инвойса',
+			issueDate: 'Дата выдачи',
+			dueDate: 'Срок оплаты',
+			descriptionLabel: 'Описание',
+			descriptionText: 'Проживание',
+			amountExclVat: 'Сумма без НДС',
+			vatLabel: 'НДС',
+			amountTotal: 'Итого к оплате',
+			iban: 'IBAN',
+			bic: 'BIC',
+			reference: 'Назначение платежа',
+			statusLabel: 'Статус',
+		},
+		bookingGenerateInvoice: {
+			btn: 'Создать инвойс',
+			alreadyIssued: 'Инвойс уже создан',
+		},
+		marketingComposer: {
+			title: 'Рассылки',
+			subtitle: 'Письмо всем гостям, давшим согласие на маркетинговые рассылки.',
+			subject: 'Тема письма',
+			subjectPlaceholder: 'напр. Скидка -15% на сентябрь',
+			body: 'Текст письма',
+			bodyPlaceholder: 'Текст сообщения...',
+			bodyHint: 'Обычный текст — переносы строк станут абзацами в письме.',
+			recipientsNote: 'Письмо получат только гости с активным согласием на маркетинговые рассылки.',
+			sendBtn: 'Отправить рассылку',
+			sentNotice: 'Рассылка отправлена.',
+			historyTitle: 'История рассылок',
+			colSubject: 'Тема',
+			colRecipients: 'Получателей',
+			colDate: 'Дата',
+			empty: 'Ещё не было ни одной рассылки.',
+			errorRequired: 'Заполните тему и текст письма.',
+			errorNoRecipients: 'Нет ни одного гостя с согласием на маркетинговые рассылки.',
 		},
 	},
 };

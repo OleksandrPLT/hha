@@ -1,0 +1,185 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../db/client';
+import { admins, organizations, guests, invoices } from '../../../db/schema';
+import { eq, desc } from 'drizzle-orm';
+import { getAdminLocale, admin as adminCopy } from '../../../i18n/admin';
+import { currency } from '../../../data/pricing';
+
+export const prerender = false;
+
+const adminId = await Astro.session?.get('adminId');
+if (!adminId) {
+	return Astro.redirect('/admin/login');
+}
+const currentAdmin = db.select().from(admins).where(eq(admins.id, adminId)).get();
+if (!currentAdmin) {
+	return Astro.redirect('/admin/login');
+}
+
+const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = adminCopy[locale].organizationDetail;
+const listCopy = adminCopy[locale].invoicesList;
+
+const orgId = Number(Astro.params.id);
+if (!Number.isInteger(orgId)) {
+	return Astro.redirect('/admin/organizations');
+}
+const org = db.select().from(organizations).where(eq(organizations.id, orgId)).get();
+if (!org) {
+	return Astro.redirect('/admin/organizations');
+}
+
+const linkedGuests = db.select().from(guests).where(eq(guests.organizationId, orgId)).all();
+const orgInvoices = db.select().from(invoices).where(eq(invoices.organizationId, orgId)).orderBy(desc(invoices.createdAt)).all();
+
+const statusLabels: Record<string, string> = {
+	issued: listCopy.statusIssued,
+	paid: listCopy.statusPaid,
+	cancelled: listCopy.statusCancelled,
+};
+---
+
+<AdminLayout title={org.name} adminName={currentAdmin.fullName} activeNav="organizations">
+	<a href="/admin/organizations" class="back-link">{copy.back}</a>
+	<h1>{org.name}</h1>
+
+	<div class="detail-grid">
+		<section class="card">
+			<dl>
+				<div><dt>{copy.regCode}</dt><dd>{org.regCode ?? '—'}</dd></div>
+				<div><dt>{copy.vat}</dt><dd>{org.vat ?? '—'}</dd></div>
+				<div><dt>{copy.address}</dt><dd>{org.address ?? '—'}</dd></div>
+			</dl>
+		</section>
+
+		<section class="card card--wide">
+			<h2>{copy.guestsSection}</h2>
+			{linkedGuests.length === 0 ? (
+				<p class="field-note">{copy.noGuests}</p>
+			) : (
+				<ul class="plain-list">
+					{linkedGuests.map((g) => (
+						<li>
+							<a href={`/admin/guests/${g.id}`}>{g.fullName}</a> — {g.email}
+						</li>
+					))}
+				</ul>
+			)}
+		</section>
+
+		<section class="card card--wide">
+			<h2>{copy.invoicesSection}</h2>
+			{orgInvoices.length === 0 ? (
+				<p class="field-note">{copy.noInvoices}</p>
+			) : (
+				<ul class="plain-list">
+					{orgInvoices.map((inv) => (
+						<li>
+							<a href={`/admin/invoices/${inv.id}`}>{inv.invoiceNumber}</a> — {currency}
+							{(inv.amountTotalCents / 100).toFixed(2)} — {statusLabels[inv.status] ?? inv.status}
+						</li>
+					))}
+				</ul>
+			)}
+		</section>
+	</div>
+
+	<style>
+		.back-link {
+			display: inline-block;
+			margin-bottom: 0.75rem;
+			font-size: 0.82rem;
+			color: var(--text-dark-muted);
+			text-decoration: none;
+		}
+
+		.back-link:hover {
+			color: var(--accent);
+		}
+
+		h1 {
+			margin: 0 0 1.25rem;
+			font-size: 1.4rem;
+			font-weight: 700;
+		}
+
+		.detail-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 1rem;
+		}
+
+		.card {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			padding: 1.25rem;
+		}
+
+		.card--wide {
+			grid-column: 1 / -1;
+		}
+
+		.card h2 {
+			margin: 0 0 0.9rem;
+			font-size: 0.95rem;
+			font-weight: 700;
+		}
+
+		dl {
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+			margin: 0;
+		}
+
+		dl div {
+			display: flex;
+			justify-content: space-between;
+			gap: 1rem;
+			font-size: 0.85rem;
+		}
+
+		dt {
+			color: var(--text-dark-muted);
+		}
+
+		dd {
+			margin: 0;
+			font-weight: 600;
+		}
+
+		.field-note {
+			margin: 0;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+		}
+
+		.plain-list {
+			list-style: none;
+			margin: 0;
+			padding: 0;
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+			font-size: 0.85rem;
+		}
+
+		.plain-list a {
+			color: var(--accent);
+			font-weight: 600;
+			text-decoration: none;
+		}
+
+		.plain-list a:hover {
+			text-decoration: underline;
+		}
+
+		@media (max-width: 760px) {
+			.detail-grid {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+</AdminLayout>

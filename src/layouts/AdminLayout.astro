@@ -11,7 +11,7 @@ import { adminLocales, getAdminLocale, admin } from '../i18n/admin';
 interface Props {
 	title: string;
 	adminName?: string;
-	activeNav?: 'overview' | 'guests' | 'rooms' | 'bookings' | 'checkin' | 'promotions';
+	activeNav?: 'overview' | 'guests' | 'rooms' | 'bookings' | 'checkin' | 'promotions' | 'invoices' | 'organizations' | 'marketing';
 }
 
 const { title, adminName, activeNav } = Astro.props;
@@ -297,6 +297,32 @@ const returnTo = encodeURIComponent(Astro.url.pathname + Astro.url.search);
 									></path><circle cx="7.5" cy="7.5" r="1.25"></circle></svg
 								>
 								{copy.promotions}
+							</a>
+						</li>
+						<li>
+							<a href="/admin/invoices" class={activeNav === 'invoices' ? 'is-active' : ''}>
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+									><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><path d="M14 2v6h6"></path><path d="M9 13h6"></path><path
+										d="M9 17h6"></path></svg
+								>
+								{copy.invoices}
+							</a>
+						</li>
+						<li>
+							<a href="/admin/organizations" class={activeNav === 'organizations' ? 'is-active' : ''}>
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+									><path d="M3 21h18"></path><path d="M5 21V7l7-4 7 4v14"></path><path d="M9 9h1"></path><path d="M14 9h1"></path><path
+										d="M9 13h1"></path><path d="M14 13h1"></path><path d="M10 21v-4h4v4"></path></svg
+								>
+								{copy.organizations}
+							</a>
+						</li>
+						<li>
+							<a href="/admin/marketing" class={activeNav === 'marketing' ? 'is-active' : ''}>
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+									><path d="M22 2 11 13"></path><path d="M22 2 15 22l-4-9-9-4z"></path></svg
+								>
+								{copy.marketing}
 							</a>
 						</li>
 						<li>

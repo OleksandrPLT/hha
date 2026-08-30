@@ -16,6 +16,7 @@ import { guests } from '../../../db/schema';
 import { isValidEmail } from '../../../lib/auth';
 import { isGoogleOAuthConfigured } from '../../../lib/oauth';
 import { isTelegramConfigured, telegramBotUsername } from '../../../lib/telegram';
+import { linkOrganization } from '../../../lib/organization';
 import { eq, and, ne } from 'drizzle-orm';
 
 const rawLocale = Astro.params.locale;
@@ -110,16 +111,25 @@ if (Astro.request.method === 'POST') {
 					? { avatarUrl: submittedAvatar, avatarSource: 'upload' }
 					: {};
 
+			const companyName = String(form.get('companyName') || '');
+			const companyRegCode = String(form.get('companyRegCode') || '');
+			const companyVat = String(form.get('companyVat') || '');
+			const companyAddress = String(form.get('companyAddress') || '');
+			// Прив'язка до спільної організації (2026-08-30) — find-or-create по
+			// regCode, щоб кілька гостей з тим самим regCode ділили один запис.
+			const organizationId = isCompany && (companyName || companyRegCode) ? linkOrganization({ name: companyName, regCode: companyRegCode, vat: companyVat, address: companyAddress }) : null;
+
 			db.update(guests)
 				.set({
 					fullName,
 					email,
 					phone: `${phoneCountry} ${phoneNumber}`,
 					isCompany,
-					companyName: isCompany ? String(form.get('companyName') || '') || null : null,
-					companyRegCode: isCompany ? String(form.get('companyRegCode') || '') || null : null,
-					companyVat: isCompany ? String(form.get('companyVat') || '') || null : null,
-					companyAddress: isCompany ? String(form.get('companyAddress') || '') || null : null,
+					companyName: isCompany ? companyName || null : null,
+					companyRegCode: isCompany ? companyRegCode || null : null,
+					companyVat: isCompany ? companyVat || null : null,
+					companyAddress: isCompany ? companyAddress || null : null,
+					organizationId,
 					nationality: String(form.get('nationality') || '') || null,
 					dateOfBirth: String(form.get('dateOfBirth') || '') || null,
 					addressLine: String(form.get('address') || '') || null,

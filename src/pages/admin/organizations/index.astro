@@ -1,0 +1,128 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../db/client';
+import { admins, organizations, guests } from '../../../db/schema';
+import { eq, desc } from 'drizzle-orm';
+import { getAdminLocale, admin as adminCopy } from '../../../i18n/admin';
+
+export const prerender = false;
+
+const adminId = await Astro.session?.get('adminId');
+if (!adminId) {
+	return Astro.redirect('/admin/login');
+}
+const currentAdmin = db.select().from(admins).where(eq(admins.id, adminId)).get();
+if (!currentAdmin) {
+	return Astro.redirect('/admin/login');
+}
+
+const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = adminCopy[locale].organizationsList;
+
+const allOrgs = db.select().from(organizations).orderBy(desc(organizations.createdAt)).all();
+const allGuests = db.select().from(guests).all();
+const guestCountByOrg = new Map<number, number>();
+for (const g of allGuests) {
+	if (g.organizationId != null) guestCountByOrg.set(g.organizationId, (guestCountByOrg.get(g.organizationId) ?? 0) + 1);
+}
+---
+
+<AdminLayout title={copy.title} adminName={currentAdmin.fullName} activeNav="organizations">
+	<h1>{copy.title}</h1>
+	<p class="page-subtitle">{copy.subtitle}</p>
+
+	{
+		allOrgs.length === 0 ? (
+			<p class="empty-note">{copy.empty}</p>
+		) : (
+			<div class="table-wrap">
+				<table>
+					<thead>
+						<tr>
+							<th>{copy.colName}</th>
+							<th>{copy.colRegCode}</th>
+							<th>{copy.colGuests}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{allOrgs.map((o) => (
+							<tr>
+								<td><a href={`/admin/organizations/${o.id}`}>{o.name}</a></td>
+								<td class="mono">{o.regCode ?? '—'}</td>
+								<td>{guestCountByOrg.get(o.id) ?? 0}</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+		)
+	}
+
+	<style>
+		h1 {
+			margin: 0;
+			font-size: 1.4rem;
+			font-weight: 700;
+		}
+
+		.page-subtitle {
+			margin: 0 0 1.25rem;
+			font-size: 0.85rem;
+			color: var(--text-dark-muted);
+			max-width: 40rem;
+		}
+
+		.empty-note {
+			color: var(--text-dark-muted);
+			font-size: 0.88rem;
+		}
+
+		.table-wrap {
+			background: #fff;
+			border: 1px solid var(--border-light);
+			border-radius: 0.85rem;
+			overflow-x: auto;
+		}
+
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 0.85rem;
+		}
+
+		th,
+		td {
+			text-align: left;
+			padding: 0.65rem 1rem;
+			white-space: nowrap;
+			vertical-align: middle;
+		}
+
+		.mono {
+			font-size: 0.78rem;
+			color: var(--text-dark-muted);
+		}
+
+		thead th {
+			font-size: 0.72rem;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			color: var(--text-dark-muted);
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		tbody tr:not(:last-child) td {
+			border-bottom: 1px solid var(--border-light);
+		}
+
+		tbody a {
+			color: var(--accent);
+			font-weight: 600;
+			text-decoration: none;
+		}
+
+		tbody a:hover {
+			text-decoration: underline;
+		}
+	</style>
+</AdminLayout>
