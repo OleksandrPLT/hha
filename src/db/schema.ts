@@ -234,6 +234,13 @@ export const bookings = sqliteTable('bookings', {
 	// Revolut Merchant API order id — для перевірки статусу оплати на
 	// сервері (GET /orders/{id}) перед тим, як довіряти client-side onSuccess.
 	paymentRef: text('payment_ref'),
+	// Хостована сторінка оплати Revolut (order.checkout_url) — 2026-08-30:
+	// відмовились від вбудованого JS-віджета (RevolutCheckout embed.js),
+	// бо попап відкривався порожнім (ймовірно, домен hha.ee не
+	// зареєстрований в налаштуваннях Merchant API для embed — Revolut
+	// вимагає цього для вбудованих попапів). Проста навігація на
+	// хостовану сторінку Revolut такого обмеження не має.
+	paymentCheckoutUrl: text('payment_checkout_url'),
 
 	specialRequests: text('special_requests'),
 

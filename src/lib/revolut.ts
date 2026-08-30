@@ -30,10 +30,11 @@ export interface RevolutOrder {
 	id: string;
 	public_id: string;
 	state: 'pending' | 'processing' | 'completed' | 'cancelled' | 'failed';
+	checkout_url?: string;
 	[key: string]: unknown;
 }
 
-export async function createRevolutOrder(params: { amountCents: number; currency: string; description: string; email?: string; ref: string }): Promise<RevolutOrder> {
+export async function createRevolutOrder(params: { amountCents: number; currency: string; description: string; email?: string; ref: string; redirectUrl?: string }): Promise<RevolutOrder> {
 	const res = await fetch(`${API_BASE}/orders`, {
 		method: 'POST',
 		headers: {
@@ -47,6 +48,7 @@ export async function createRevolutOrder(params: { amountCents: number; currency
 			capture_mode: 'AUTOMATIC',
 			customer_email: params.email,
 			merchant_order_ext_ref: params.ref,
+			redirect_url: params.redirectUrl,
 		}),
 	});
 	if (!res.ok) {

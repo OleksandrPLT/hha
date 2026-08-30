@@ -124,8 +124,9 @@ if (Astro.request.method === 'POST') {
 					description: `Hostel 3A — ${roomTitle}, ${checkIn} → ${checkOut}`,
 					email,
 					ref: `booking-${bookingId}`,
+					redirectUrl: `https://hha.ee/${locale}/book/confirmation/${bookingId}`,
 				});
-				db.update(bookings).set({ paymentRef: order.id }).where(eq(bookings.id, bookingId)).run();
+				db.update(bookings).set({ paymentRef: order.id, paymentCheckoutUrl: order.checkout_url ?? null }).where(eq(bookings.id, bookingId)).run();
 			} catch {
 				// Revolut тимчасово недоступний — бронь лишається зі
 				// status=pending/paymentMethod=revolut, paymentRef=null;

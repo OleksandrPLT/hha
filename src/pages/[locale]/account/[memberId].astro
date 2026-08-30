@@ -101,7 +101,7 @@ const bookingPaymentLabels: Record<string, string> = {
 	refunded: bkCopy.confirmation.paymentUnpaid,
 };
 const revolutReady = isRevolutConfigured();
-const hasPayableBooking = revolutReady && myBookings.some((b) => b.paymentMethod === 'revolut' && b.paymentStatus !== 'paid' && b.paymentRef);
+const hasPayableBooking = revolutReady && myBookings.some((b) => b.paymentMethod === 'revolut' && b.paymentStatus !== 'paid' && b.paymentRef && b.paymentCheckoutUrl);
 ---
 
 <BaseLayout locale={locale} title={`${copy.dashboard.title} — Hostel & Hotel Apartments`} description={copy.dashboard.title} path={`/account/${memberId}`}>
@@ -363,17 +363,16 @@ const hasPayableBooking = revolutReady && myBookings.some((b) => b.paymentMethod
 												<span class={`bk-badge ${b.paymentStatus === 'paid' ? 'bk-badge--paid' : ''}`}>{bookingPaymentLabels[b.paymentStatus] ?? b.paymentStatus}</span>
 											</div>
 											{
-												revolutReady && b.paymentMethod === 'revolut' && b.paymentStatus !== 'paid' && b.paymentRef && (
-													<button
-														type="button"
+												revolutReady && b.paymentMethod === 'revolut' && b.paymentStatus !== 'paid' && b.paymentRef && b.paymentCheckoutUrl && (
+													<a
+														href={b.paymentCheckoutUrl}
+														target="_blank"
+														rel="noopener noreferrer"
 														class="booking-item__pay-btn"
 														data-pay-booking={b.id}
-														data-public-id={b.paymentRef}
-														data-full-name={b.fullName}
-														data-email={b.email}
 													>
 														{bkCopy.page.paymentRevolut}
-													</button>
+													</a>
 												)
 											}
 										</div>
@@ -389,59 +388,42 @@ const hasPayableBooking = revolutReady && myBookings.some((b) => b.paymentMethod
 
 	{
 		hasPayableBooking && (
-			<Fragment>
-				<script src="https://merchant.revolut.com/embed.js" is:inline />
-				<script is:inline>
-					document.addEventListener('click', (e) => {
-						const btn = e.target.closest('[data-pay-booking]');
-						if (!btn) return;
-						const bookingId = Number(btn.dataset.payBooking);
-						const publicId = btn.dataset.publicId;
-						const fullName = btn.dataset.fullName;
-						const email = btn.dataset.email;
-						if (typeof RevolutCheckout === 'undefined') {
-							btn.textContent = 'Widget failed to load';
-							return;
-						}
-						const originalText = btn.textContent;
-						btn.disabled = true;
-						btn.textContent = '…';
-						RevolutCheckout(publicId, 'prod').then((instance) => {
-							btn.disabled = false;
-							btn.textContent = originalText;
-							instance.payWithPopup({
-								name: fullName,
-								email: email,
-								async onSuccess() {
-									btn.disabled = true;
-									btn.textContent = 'Verifying…';
-									try {
-										const res = await fetch('/api/booking/confirm-payment', {
-											method: 'POST',
-											headers: { 'Content-Type': 'application/json' },
-											body: JSON.stringify({ bookingId }),
-										});
-										const data = await res.json();
-										if (data.paid) {
-											window.location.reload();
-										} else {
-											btn.disabled = false;
-											btn.textContent = originalText;
-										}
-									} catch {
-										btn.disabled = false;
-										btn.textContent = originalText;
-									}
-								},
-								onError() {
-									btn.disabled = false;
-									btn.textContent = originalText;
-								},
+			<script is:inline>
+				// Клік відкриває хостовану сторінку оплати Revolut в новій вкладці
+				// (звичайне посилання, браузер сам це робить) — тут лише запускаємо
+				// опитування сервера, поки гість оплачує в тій вкладці.
+				document.addEventListener('click', (e) => {
+					const btn = e.target.closest('[data-pay-booking]');
+					if (!btn || btn.dataset.polling === '1') return;
+					btn.dataset.polling = '1';
+					const bookingId = Number(btn.dataset.payBooking);
+					const originalText = btn.textContent;
+					let attempts = 0;
+					const interval = setInterval(async () => {
+						attempts++;
+						try {
+							const res = await fetch('/api/booking/confirm-payment', {
+								method: 'POST',
+								headers: { 'Content-Type': 'application/json' },
+								body: JSON.stringify({ bookingId }),
 							});
-						});
-					});
-				</script>
-			</Fragment>
+							const data = await res.json();
+							if (data.paid) {
+								clearInterval(interval);
+								window.location.reload();
+								return;
+							}
+						} catch {
+							// ignore, спробуємо ще раз на наступному тіку
+						}
+						if (attempts >= 40) {
+							clearInterval(interval);
+							btn.dataset.polling = '0';
+							btn.textContent = originalText;
+						}
+					}, 4000);
+				});
+			</script>
 		)
 	}
 
