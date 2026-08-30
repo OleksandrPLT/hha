@@ -253,3 +253,47 @@ export const bookings = sqliteTable('bookings', {
 
 export type Booking = typeof bookings.$inferSelect;
 export type NewBooking = typeof bookings.$inferInsert;
+
+// Живий чат на сайті (Фаза 5, ТЗ §5.5 "онлайн-чат на сайте → Telegram-бот").
+// visitorToken — випадковий рядок в cookie відвідувача (не потребує
+// акаунта — і гість без реєстрації може написати); guestId — якщо гість
+// залогінений, прив'язуємо для контексту (ім'я/email видно команді).
+// Один visitorToken = один тред (проста модель, без "закриття" треду —
+// нова розмова просто продовжує той самий тред, як в більшості
+// live-chat віджетів).
+export const chatThreads = sqliteTable('chat_threads', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	visitorToken: text('visitor_token').notNull().unique(),
+	guestId: integer('guest_id').references(() => guests.id, { onDelete: 'set null' }),
+	visitorName: text('visitor_name'),
+	createdAt: text('created_at')
+		.notNull()
+		.default(sql`(current_timestamp)`),
+	lastMessageAt: text('last_message_at')
+		.notNull()
+		.default(sql`(current_timestamp)`),
+});
+
+export type ChatThread = typeof chatThreads.$inferSelect;
+export type NewChatThread = typeof chatThreads.$inferInsert;
+
+// sender: 'visitor' | 'team'. telegramMessageId — id повідомлення, яке МИ
+// надіслали в Telegram при пересилці (не вхідного) — потрібен, щоб
+// зв'язати "reply" команди в Telegram із конкретним тредом (команда
+// відповідає через Telegram reply на конкретне повідомлення-пересилку,
+// вебхук дивиться reply_to_message.message_id і шукає його тут).
+export const chatMessages = sqliteTable('chat_messages', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	threadId: integer('thread_id')
+		.notNull()
+		.references(() => chatThreads.id, { onDelete: 'cascade' }),
+	sender: text('sender').notNull(),
+	body: text('body').notNull(),
+	telegramMessageId: integer('telegram_message_id'),
+	createdAt: text('created_at')
+		.notNull()
+		.default(sql`(current_timestamp)`),
+});
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type NewChatMessage = typeof chatMessages.$inferInsert;

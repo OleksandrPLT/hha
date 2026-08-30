@@ -4,6 +4,7 @@ import { locales, htmlLang, type Locale } from '../i18n/locales';
 import ScrollTools from '../components/ScrollTools.astro';
 import AuthModal from '../components/AuthModal.astro';
 import AccountModal from '../components/AccountModal.astro';
+import ChatWidget from '../components/ChatWidget.astro';
 
 interface Props {
 	locale: Locale;
@@ -60,5 +61,6 @@ const defaultHref = `${Astro.site}en${cleanPath}`;
 		<AuthModal locale={locale} />
 		<AccountModal locale={locale} />
 		<slot />
+		<ChatWidget locale={locale} />
 	</body>
 </html>

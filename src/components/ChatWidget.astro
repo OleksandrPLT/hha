@@ -1,0 +1,331 @@
+---
+// Живий чат (Фаза 5, ТЗ §5.5) — плаваюча бульбашка внизу праворуч,
+// підключена глобально через BaseLayout (як AuthModal/AccountModal).
+// Гість не потребує акаунта — visitorToken в cookie на сервері
+// (src/pages/api/chat/send.ts). Polling кожні кілька секунд, поки панель
+// відкрита — той самий підхід, що й перевірка оплати Revolut, без
+// вебсокетів (простіше і надійніше на shared-хостингу).
+import type { Locale } from '../i18n/locales';
+import { chat } from '../i18n/chat';
+
+interface Props {
+	locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = chat[locale];
+---
+
+<div class="chat-widget" id="chat-widget">
+	<button type="button" class="chat-widget__bubble" id="chat-bubble" aria-label={copy.bubbleLabel}>
+		<svg class="chat-widget__icon-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+			><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"
+			></path></svg
+		>
+		<svg class="chat-widget__icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+		<span class="chat-widget__badge" id="chat-badge" hidden></span>
+	</button>
+
+	<div class="chat-widget__panel" id="chat-panel" hidden role="dialog" aria-modal="false" aria-labelledby="chat-panel-title">
+		<div class="chat-widget__head">
+			<p class="chat-widget__title" id="chat-panel-title">{copy.heading}</p>
+			<p class="chat-widget__subtitle">{copy.subheading}</p>
+		</div>
+		<div class="chat-widget__body" id="chat-body">
+			<p class="chat-widget__empty" id="chat-empty">{copy.emptyState}</p>
+		</div>
+		<form class="chat-widget__form" id="chat-form">
+			<input type="text" name="text" id="chat-input" class="chat-widget__input" placeholder={copy.placeholder} maxlength="2000" autocomplete="off" />
+			<button type="submit" class="chat-widget__send" aria-label={copy.send}>
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" /></svg>
+			</button>
+		</form>
+		<p class="chat-widget__offline-note">{copy.offlineNote}</p>
+	</div>
+</div>
+
+<script is:inline>
+	(function () {
+		const widget = document.getElementById('chat-widget');
+		const bubble = document.getElementById('chat-bubble');
+		const panel = document.getElementById('chat-panel');
+		const body = document.getElementById('chat-body');
+		const empty = document.getElementById('chat-empty');
+		const form = document.getElementById('chat-form');
+		const input = document.getElementById('chat-input');
+		const badge = document.getElementById('chat-badge');
+
+		let lastId = 0;
+		let pollTimer = null;
+		let opened = false;
+		let unread = 0;
+
+		function renderMessage(m) {
+			const row = document.createElement('div');
+			row.className = 'chat-msg chat-msg--' + (m.sender === 'team' ? 'team' : 'visitor');
+			row.textContent = m.body;
+			body.appendChild(row);
+			if (m.id > lastId) lastId = m.id;
+		}
+
+		function scrollToBottom() {
+			body.scrollTop = body.scrollHeight;
+		}
+
+		async function poll() {
+			try {
+				const res = await fetch('/api/chat/poll?after=' + lastId);
+				const data = await res.json();
+				if (data.messages && data.messages.length) {
+					empty.hidden = true;
+					data.messages.forEach(renderMessage);
+					scrollToBottom();
+					if (!opened) {
+						unread += data.messages.filter((m) => m.sender === 'team').length;
+						if (unread > 0) {
+							badge.hidden = false;
+							badge.textContent = String(unread);
+						}
+					}
+				}
+			} catch {
+				// тиха невдача — спробуємо на наступному тіку
+			}
+		}
+
+		function startPolling() {
+			if (pollTimer) return;
+			poll();
+			pollTimer = setInterval(poll, 4000);
+		}
+
+		function open() {
+			opened = true;
+			widget.classList.add('is-open');
+			panel.hidden = false;
+			bubble.setAttribute('aria-expanded', 'true');
+			unread = 0;
+			badge.hidden = true;
+			startPolling();
+			setTimeout(() => input?.focus(), 50);
+		}
+
+		function close() {
+			opened = false;
+			widget.classList.remove('is-open');
+			panel.hidden = true;
+			bubble.setAttribute('aria-expanded', 'false');
+		}
+
+		bubble?.addEventListener('click', () => {
+			if (widget.classList.contains('is-open')) close();
+			else open();
+		});
+
+		form?.addEventListener('submit', async (e) => {
+			e.preventDefault();
+			const text = input.value.trim();
+			if (!text) return;
+			input.value = '';
+			try {
+				const res = await fetch('/api/chat/send', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ text }),
+				});
+				const data = await res.json();
+				if (data.message) {
+					empty.hidden = true;
+					renderMessage(data.message);
+					scrollToBottom();
+				}
+			} catch {
+				input.value = text;
+			}
+		});
+
+		// Легкий фоновий polling навіть при закритій панелі — щоб бейдж
+		// "непрочитане" з'являвся, не чекаючи відкриття.
+		startPolling();
+	})();
+</script>
+
+<style>
+	.chat-widget {
+		position: fixed;
+		right: 1.25rem;
+		bottom: 1.25rem;
+		z-index: 60;
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	}
+
+	.chat-widget__bubble {
+		position: relative;
+		width: 3.4rem;
+		height: 3.4rem;
+		border-radius: 50%;
+		border: none;
+		background: var(--text-dark, #14161a);
+		color: #fff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+	}
+
+	.chat-widget__bubble:hover {
+		filter: brightness(1.2);
+	}
+
+	.chat-widget__icon-close {
+		display: none;
+	}
+
+	.chat-widget.is-open .chat-widget__icon-open {
+		display: none;
+	}
+
+	.chat-widget.is-open .chat-widget__icon-close {
+		display: block;
+	}
+
+	.chat-widget__badge {
+		position: absolute;
+		top: -0.2rem;
+		right: -0.2rem;
+		min-width: 1.2rem;
+		height: 1.2rem;
+		border-radius: 999px;
+		background: #c0392b;
+		color: #fff;
+		font-size: 0.68rem;
+		font-weight: 700;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0 0.25rem;
+	}
+
+	.chat-widget__panel {
+		position: absolute;
+		right: 0;
+		bottom: 4.1rem;
+		width: min(21rem, calc(100vw - 2.5rem));
+		max-height: min(28rem, calc(100vh - 8rem));
+		background: #fff;
+		border-radius: 1rem;
+		box-shadow: 0 24px 60px rgba(20, 22, 26, 0.22);
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.chat-widget__head {
+		padding: 1rem 1.1rem 0.8rem;
+		background: var(--text-dark, #14161a);
+		color: #fff;
+	}
+
+	.chat-widget__title {
+		margin: 0 0 0.15rem;
+		font-weight: 700;
+		font-size: 0.95rem;
+	}
+
+	.chat-widget__subtitle {
+		margin: 0;
+		font-size: 0.76rem;
+		color: rgba(255, 255, 255, 0.7);
+	}
+
+	.chat-widget__body {
+		flex: 1;
+		min-height: 10rem;
+		overflow-y: auto;
+		padding: 0.9rem 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.chat-widget__empty {
+		margin: auto 0;
+		text-align: center;
+		font-size: 0.82rem;
+		color: var(--text-dark-muted, #5b6068);
+	}
+
+	.chat-msg {
+		max-width: 82%;
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.75rem;
+		font-size: 0.85rem;
+		line-height: 1.4;
+		word-break: break-word;
+		white-space: pre-wrap;
+	}
+
+	.chat-msg--visitor {
+		align-self: flex-end;
+		background: var(--accent, #0072ce);
+		color: #fff;
+		border-bottom-right-radius: 0.2rem;
+	}
+
+	.chat-msg--team {
+		align-self: flex-start;
+		background: var(--bg-light, #f5f6f8);
+		color: var(--text-dark, #14161a);
+		border-bottom-left-radius: 0.2rem;
+	}
+
+	.chat-widget__form {
+		display: flex;
+		gap: 0.5rem;
+		padding: 0.7rem;
+		border-top: 1px solid var(--border-light, #e2e5ea);
+	}
+
+	.chat-widget__input {
+		flex: 1;
+		font: inherit;
+		font-size: 0.85rem;
+		padding: 0.55rem 0.75rem;
+		border-radius: 0.6rem;
+		border: 1px solid var(--border-light, #e2e5ea);
+	}
+
+	.chat-widget__send {
+		width: 2.3rem;
+		height: 2.3rem;
+		flex-shrink: 0;
+		border-radius: 0.6rem;
+		border: none;
+		background: var(--text-dark, #14161a);
+		color: #fff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+	}
+
+	.chat-widget__send:hover {
+		filter: brightness(1.2);
+	}
+
+	.chat-widget__offline-note {
+		margin: 0;
+		padding: 0.5rem 1rem 0.7rem;
+		font-size: 0.68rem;
+		color: var(--text-dark-muted, #5b6068);
+		text-align: center;
+	}
+
+	@media (max-width: 480px) {
+		.chat-widget {
+			right: 0.75rem;
+			bottom: 0.75rem;
+		}
+	}
+</style>

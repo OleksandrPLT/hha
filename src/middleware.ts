@@ -20,6 +20,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
 	if (!password) return next();
 
 	const url = new URL(context.request.url);
+
+	// Telegram сам стукає в наш вебхук (сервер-до-сервера, без будь-яких
+	// cookie) — цей шлях має лишатись доступним незалежно від тех-режиму,
+	// інакше відповіді команди в живому чаті мовчки губляться.
+	if (url.pathname === '/api/chat/telegram-webhook') return next();
+
 	const keyParam = url.searchParams.get('key');
 
 	if (keyParam === password) {
