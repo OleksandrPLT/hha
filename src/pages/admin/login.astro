@@ -3,11 +3,15 @@
 // плутати з кабінетом гостя, навіть якщо той самий браузер колись
 // заходив і туди, і туди.
 import { db } from '../../db/client';
-import { admins } from '../../db/schema';
+import { admins as adminsTable } from '../../db/schema';
 import { verifyPassword } from '../../lib/auth';
 import { eq } from 'drizzle-orm';
+import { getAdminLocale, admin as adminCopy } from '../../i18n/admin';
 
 export const prerender = false;
+
+const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = adminCopy[locale].login;
 
 let error = '';
 let emailValue = '';
@@ -20,23 +24,23 @@ if (Astro.request.method === 'POST') {
 	const password = String(form.get('password') || '');
 	emailValue = email;
 
-	const admin = db.select().from(admins).where(eq(admins.email, email)).get();
-	if (!admin || !(await verifyPassword(password, admin.passwordHash))) {
-		error = 'Невірний email або пароль.';
+	const adminRow = db.select().from(adminsTable).where(eq(adminsTable.email, email)).get();
+	if (!adminRow || !(await verifyPassword(password, adminRow.passwordHash))) {
+		error = copy.errorInvalid;
 	} else {
-		await Astro.session?.set('adminId', admin.id);
+		await Astro.session?.set('adminId', adminRow.id);
 		return Astro.redirect('/admin');
 	}
 }
 ---
 
 <!doctype html>
-<html lang="uk">
+<html lang={locale}>
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="robots" content="noindex, nofollow" />
-		<title>Вхід — Адмін-панель Hostel 3A</title>
+		<title>{copy.title} — {copy.subtitle}</title>
 		<style>
 			@import '@fontsource-variable/inter';
 
@@ -128,23 +132,48 @@ if (Astro.request.method === 'POST') {
 			button:hover {
 				background: #000;
 			}
+
+			.lang-switch {
+				display: flex;
+				justify-content: flex-end;
+				gap: 0.3rem;
+				margin-bottom: 0.75rem;
+			}
+
+			.lang-switch a {
+				font-size: 0.7rem;
+				font-weight: 700;
+				color: #8a8f98;
+				text-decoration: none;
+				padding: 0.15rem 0.4rem;
+				border-radius: 0.3rem;
+			}
+
+			.lang-switch a.is-active {
+				background: #e2e5ea;
+				color: #14161a;
+			}
 		</style>
 	</head>
 	<body>
 		<div class="card">
-			<h1>Адмін-панель</h1>
-			<p class="subtitle">Hostel & Hotel Apartments</p>
+			<div class="lang-switch">
+				<a href={`/admin/set-locale?locale=uk&return=${encodeURIComponent('/admin/login')}`} class={locale === 'uk' ? 'is-active' : ''}>UK</a>
+				<a href={`/admin/set-locale?locale=ru&return=${encodeURIComponent('/admin/login')}`} class={locale === 'ru' ? 'is-active' : ''}>RU</a>
+			</div>
+			<h1>{copy.title}</h1>
+			<p class="subtitle">{copy.subtitle}</p>
 			{error && <p class="form-error">{error}</p>}
 			<form method="POST">
 				<label>
-					Email
+					{copy.email}
 					<input type="email" name="email" required value={emailValue} />
 				</label>
 				<label>
-					Пароль
+					{copy.password}
 					<input type="password" name="password" required />
 				</label>
-				<button type="submit">Увійти</button>
+				<button type="submit">{copy.submit}</button>
 			</form>
 		</div>
 	</body>

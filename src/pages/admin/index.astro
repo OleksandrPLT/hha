@@ -3,6 +3,7 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
 import { db } from '../../db/client';
 import { admins, guests } from '../../db/schema';
 import { eq, desc } from 'drizzle-orm';
+import { getAdminLocale, admin as adminCopy } from '../../i18n/admin';
 
 export const prerender = false;
 
@@ -15,6 +16,10 @@ const admin = db.select().from(admins).where(eq(admins.id, adminId)).get();
 if (!admin) {
 	return Astro.redirect('/admin/login');
 }
+
+const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = adminCopy[locale].overview;
+const dateLocale = locale === 'ru' ? 'ru-RU' : 'uk-UA';
 
 const allGuests = db.select().from(guests).orderBy(desc(guests.createdAt)).all();
 
@@ -39,50 +44,50 @@ const recent = allGuests.slice(0, 8);
 function formatDate(raw: string): string {
 	const d = new Date(raw.includes(' ') ? raw.replace(' ', 'T') + 'Z' : raw);
 	if (Number.isNaN(d.getTime())) return raw;
-	return new Intl.DateTimeFormat('uk-UA', { dateStyle: 'medium', timeStyle: 'short' }).format(d);
+	return new Intl.DateTimeFormat(dateLocale, { dateStyle: 'medium', timeStyle: 'short' }).format(d);
 }
 ---
 
-<AdminLayout title="Огляд" adminName={admin.fullName} activeNav="overview">
-	<h1>Огляд</h1>
-	<p class="page-subtitle">Дані по гостях в реальному часі. Статистика по бронюваннях/доходах з'явиться у Фазі 4, коли запрацює система бронювання.</p>
+<AdminLayout title={copy.title} adminName={admin.fullName} activeNav="overview">
+	<h1>{copy.title}</h1>
+	<p class="page-subtitle">{copy.subtitle}</p>
 
 	<div class="stat-grid">
 		<div class="stat-card">
 			<p class="stat-num">{totalGuests}</p>
-			<p class="stat-label">Гостей всього</p>
+			<p class="stat-label">{copy.statTotal}</p>
 		</div>
 		<div class="stat-card">
 			<p class="stat-num">{newLast7}</p>
-			<p class="stat-label">Нових за 7 днів</p>
+			<p class="stat-label">{copy.stat7}</p>
 		</div>
 		<div class="stat-card">
 			<p class="stat-num">{newLast30}</p>
-			<p class="stat-label">Нових за 30 днів</p>
+			<p class="stat-label">{copy.stat30}</p>
 		</div>
 		<div class="stat-card">
 			<p class="stat-num">{companyCount}</p>
-			<p class="stat-label">Юридичних осіб</p>
+			<p class="stat-label">{copy.statCompany}</p>
 		</div>
 		<div class="stat-card">
 			<p class="stat-num">{totalPoints}</p>
-			<p class="stat-label">Бонусних балів видано</p>
+			<p class="stat-label">{copy.statPoints}</p>
 		</div>
 	</div>
 
-	<h2>Останні реєстрації</h2>
+	<h2>{copy.recentTitle}</h2>
 	{
 		recent.length === 0 ? (
-			<p class="empty-note">Ще жодного гостя не зареєструвалось.</p>
+			<p class="empty-note">{copy.empty}</p>
 		) : (
 			<div class="table-wrap">
 				<table>
 					<thead>
 						<tr>
-							<th>Ім'я</th>
-							<th>Email</th>
-							<th>Телефон</th>
-							<th>Дата реєстрації</th>
+							<th>{copy.colName}</th>
+							<th>{copy.colEmail}</th>
+							<th>{copy.colPhone}</th>
+							<th>{copy.colDate}</th>
 						</tr>
 					</thead>
 					<tbody>

@@ -11,6 +11,7 @@ import { eq, desc } from 'drizzle-orm';
 import { formatMemberId } from '../../../lib/memberCard';
 import { countries, isoToFlag } from '../../../data/countries';
 import { pointsToEuros } from '../../../data/loyalty';
+import { getAdminLocale, admin as adminCopy } from '../../../i18n/admin';
 
 export const prerender = false;
 
@@ -23,6 +24,10 @@ const admin = db.select().from(admins).where(eq(admins.id, adminId)).get();
 if (!admin) {
 	return Astro.redirect('/admin/login');
 }
+
+const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = adminCopy[locale].guestDetail;
+const dateLocale = locale === 'ru' ? 'ru-RU' : 'uk-UA';
 
 const guestId = Number(Astro.params.id);
 if (!Number.isInteger(guestId)) {
@@ -45,15 +50,15 @@ if (Astro.request.method === 'POST') {
 		const body = String(form.get('body') || '').trim();
 		if (body) {
 			db.insert(guestNotes).values({ guestId, authorId: adminId, body }).run();
-			notice = 'Нотатку додано.';
+			notice = copy.noticeAdded;
 		}
 	} else if (action === 'adjust-points') {
 		const delta = Number(form.get('delta'));
 		const reason = String(form.get('reason') || '').trim();
 		if (!Number.isFinite(delta) || delta === 0) {
-			error = 'Вкажіть кількість балів (додатну або від\'ємну).';
+			error = copy.errorDeltaRequired;
 		} else if (!reason) {
-			error = "Вкажіть причину нарахування/списання — вона піде в нотатки.";
+			error = copy.errorReasonRequired;
 		} else {
 			const newTotal = Math.max(0, guest.loyaltyPoints + delta);
 			db.update(guests).set({ loyaltyPoints: newTotal }).where(eq(guests.id, guestId)).run();
@@ -61,10 +66,10 @@ if (Astro.request.method === 'POST') {
 				.values({
 					guestId,
 					authorId: adminId,
-					body: `${delta > 0 ? 'Нараховано' : 'Списано'} ${Math.abs(delta)} балів. Причина: ${reason}. Новий баланс: ${newTotal}.`,
+					body: `${delta > 0 ? copy.noteAccrued : copy.noteDeducted} ${Math.abs(delta)} ${copy.pointsWord}. ${copy.noteReason}: ${reason}. ${copy.noteNewBalance}: ${newTotal}.`,
 				})
 				.run();
-			notice = 'Баланс балів оновлено.';
+			notice = copy.noticePointsUpdated;
 		}
 	}
 
@@ -83,12 +88,12 @@ function formatDate(raw: string | null): string {
 	if (!raw) return '—';
 	const d = new Date(raw.includes(' ') ? raw.replace(' ', 'T') + 'Z' : raw);
 	if (Number.isNaN(d.getTime())) return raw;
-	return new Intl.DateTimeFormat('uk-UA', { dateStyle: 'medium', timeStyle: 'short' }).format(d);
+	return new Intl.DateTimeFormat(dateLocale, { dateStyle: 'medium', timeStyle: 'short' }).format(d);
 }
 ---
 
 <AdminLayout title={guest.fullName} adminName={admin.fullName} activeNav="guests">
-	<a href="/admin/guests" class="back-link">← Усі гості</a>
+	<a href="/admin/guests" class="back-link">{copy.back}</a>
 
 	<div class="head">
 		<div class="avatar" aria-hidden="true">
@@ -96,7 +101,7 @@ function formatDate(raw: string | null): string {
 		</div>
 		<div>
 			<h1>{guest.fullName}</h1>
-			<p class="member-id">{formatMemberId(guest.id)} · {guest.isCompany ? 'Юридична особа' : 'Фізична особа'}</p>
+			<p class="member-id">{formatMemberId(guest.id)} · {guest.isCompany ? copy.company : copy.individual}</p>
 		</div>
 	</div>
 
@@ -105,27 +110,27 @@ function formatDate(raw: string | null): string {
 
 	<div class="grid-2">
 		<section class="card">
-			<h2>Контакти та анкета</h2>
+			<h2>{copy.contactsTitle}</h2>
 			<dl>
-				<div><dt>Email</dt><dd>{guest.email}</dd></div>
-				<div><dt>Телефон</dt><dd>{guest.phone}</dd></div>
-				<div><dt>Громадянство</dt><dd>{countryLabel(guest.nationality) ?? '—'}</dd></div>
-				<div><dt>Дата народження</dt><dd>{guest.dateOfBirth ?? '—'}</dd></div>
-				<div><dt>Адреса</dt><dd>{guest.addressLine ?? '—'}</dd></div>
-				<div><dt>Місто</dt><dd>{guest.city ?? '—'}</dd></div>
-				<div><dt>Поштовий індекс</dt><dd>{guest.postalCode ?? '—'}</dd></div>
-				<div><dt>Країна проживання</dt><dd>{countryLabel(guest.countryOfResidence) ?? '—'}</dd></div>
-				<div><dt>Маркетингова згода</dt><dd>{guest.marketingConsent ? 'Так' : 'Ні'}</dd></div>
-				<div><dt>Згода на обробку даних</dt><dd>{guest.dataProcessingConsent ? `Так (${formatDate(guest.dataProcessingConsentAt)})` : 'Ні'}</dd></div>
-				<div><dt>Реєстрація</dt><dd>{formatDate(guest.createdAt)}</dd></div>
-				<div><dt>Google</dt><dd>{guest.googleId ? 'Підключено' : '—'}</dd></div>
-				<div><dt>Telegram</dt><dd>{guest.telegramId ? 'Підключено' : '—'}</dd></div>
+				<div><dt>{copy.email}</dt><dd>{guest.email}</dd></div>
+				<div><dt>{copy.phone}</dt><dd>{guest.phone}</dd></div>
+				<div><dt>{copy.nationality}</dt><dd>{countryLabel(guest.nationality) ?? copy.notAvailable}</dd></div>
+				<div><dt>{copy.dob}</dt><dd>{guest.dateOfBirth ?? copy.notAvailable}</dd></div>
+				<div><dt>{copy.address}</dt><dd>{guest.addressLine ?? copy.notAvailable}</dd></div>
+				<div><dt>{copy.city}</dt><dd>{guest.city ?? copy.notAvailable}</dd></div>
+				<div><dt>{copy.postal}</dt><dd>{guest.postalCode ?? copy.notAvailable}</dd></div>
+				<div><dt>{copy.country}</dt><dd>{countryLabel(guest.countryOfResidence) ?? copy.notAvailable}</dd></div>
+				<div><dt>{copy.marketing}</dt><dd>{guest.marketingConsent ? copy.yes : copy.no}</dd></div>
+				<div><dt>{copy.consent}</dt><dd>{guest.dataProcessingConsent ? `${copy.yes} (${formatDate(guest.dataProcessingConsentAt)})` : copy.no}</dd></div>
+				<div><dt>{copy.registered}</dt><dd>{formatDate(guest.createdAt)}</dd></div>
+				<div><dt>{copy.google}</dt><dd>{guest.googleId ? copy.connected : copy.notAvailable}</dd></div>
+				<div><dt>{copy.telegram}</dt><dd>{guest.telegramId ? copy.connected : copy.notAvailable}</dd></div>
 				{guest.isCompany && (
 					<Fragment>
-						<div><dt>Назва компанії</dt><dd>{guest.companyName ?? '—'}</dd></div>
-						<div><dt>Реєстраційний код</dt><dd>{guest.companyRegCode ?? '—'}</dd></div>
-						<div><dt>VAT</dt><dd>{guest.companyVat ?? '—'}</dd></div>
-						<div><dt>Адреса компанії</dt><dd>{guest.companyAddress ?? '—'}</dd></div>
+						<div><dt>{copy.companyName}</dt><dd>{guest.companyName ?? copy.notAvailable}</dd></div>
+						<div><dt>{copy.companyReg}</dt><dd>{guest.companyRegCode ?? copy.notAvailable}</dd></div>
+						<div><dt>{copy.companyVat}</dt><dd>{guest.companyVat ?? copy.notAvailable}</dd></div>
+						<div><dt>{copy.companyAddr}</dt><dd>{guest.companyAddress ?? copy.notAvailable}</dd></div>
 					</Fragment>
 				)}
 			</dl>
@@ -133,27 +138,27 @@ function formatDate(raw: string | null): string {
 
 		<div class="side-col">
 			<section class="card">
-				<h2>Бонусні бали</h2>
+				<h2>{copy.pointsTitle}</h2>
 				<p class="points-current">{guest.loyaltyPoints} <span>≈ €{pointsToEuros(guest.loyaltyPoints).toFixed(2)}</span></p>
 				<form method="POST" class="points-form">
 					<input type="hidden" name="action" value="adjust-points" />
 					<div class="points-row">
-						<input type="number" name="delta" placeholder="напр. 150 або -50" required />
-						<button type="submit">Застосувати</button>
+						<input type="number" name="delta" placeholder={copy.pointsPlaceholder} required />
+						<button type="submit">{copy.pointsApply}</button>
 					</div>
-					<input type="text" name="reason" placeholder="Причина (обов'язково)" required />
+					<input type="text" name="reason" placeholder={copy.reasonPlaceholder} required />
 				</form>
 			</section>
 
 			<section class="card">
-				<h2>Нотатки</h2>
+				<h2>{copy.notesTitle}</h2>
 				<form method="POST" class="note-form">
 					<input type="hidden" name="action" value="add-note" />
-					<textarea name="body" rows="3" placeholder="Додати нотатку про гостя..." required></textarea>
-					<button type="submit">Додати</button>
+					<textarea name="body" rows="3" placeholder={copy.notePlaceholder} required></textarea>
+					<button type="submit">{copy.noteAdd}</button>
 				</form>
 				{notes.length === 0 ? (
-					<p class="empty-note">Ще немає нотаток.</p>
+					<p class="empty-note">{copy.noNotes}</p>
 				) : (
 					<ul class="notes-list">
 						{notes.map((n) => (

@@ -1,9 +1,13 @@
 ---
 // Кабінет адміністратора (Фаза 3, ТЗ §5.3) — внутрішній інструмент, не
-// частина публічного багатомовного сайту. Свідомо БЕЗ і18n/6-мовної
-// системи, без hreflang/SEO — тільки українською, це інструмент для
-// власника/персоналу, не публічна сторінка. Окремий макет від
-// BaseLayout.astro, який несе публічний header/footer/SEO-метадані.
+// частина публічного багатомовного сайту. Окрема, легша i18n-система
+// (src/i18n/admin.ts, лише uk/ru — на прохання користувача 2026-08-30
+// "нужно русский") — без hreflang/SEO, це не публічна сторінка. Мова
+// зберігається в cookie admin_locale (не в БД), перемикається посиланням
+// внизу сайдбару. Окремий макет від BaseLayout.astro, який несе публічний
+// header/footer/SEO-метадані.
+import { adminLocales, getAdminLocale, admin } from '../i18n/admin';
+
 interface Props {
 	title: string;
 	adminName?: string;
@@ -11,15 +15,18 @@ interface Props {
 }
 
 const { title, adminName, activeNav } = Astro.props;
+const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = admin[locale].nav;
+const returnTo = encodeURIComponent(Astro.url.pathname + Astro.url.search);
 ---
 
 <!doctype html>
-<html lang="uk">
+<html lang={locale}>
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="robots" content="noindex, nofollow" />
-		<title>{title} — Адмін-панель Hostel 3A</title>
+		<title>{title} — {copy.brandSub} {copy.brand}</title>
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 		<style>
 			@import '@fontsource-variable/inter';
@@ -132,6 +139,32 @@ const { title, adminName, activeNav } = Astro.props;
 				margin: 0 0 0.6rem;
 			}
 
+			.admin-lang-switch {
+				display: flex;
+				gap: 0.3rem;
+				padding: 0 0.6rem;
+				margin: 0 0 0.6rem;
+			}
+
+			.admin-lang-switch a {
+				font-size: 0.72rem;
+				font-weight: 700;
+				letter-spacing: 0.03em;
+				color: var(--cream-muted);
+				text-decoration: none;
+				padding: 0.15rem 0.4rem;
+				border-radius: 0.3rem;
+			}
+
+			.admin-lang-switch a:hover {
+				color: var(--cream);
+			}
+
+			.admin-lang-switch a.is-active {
+				background: rgba(0, 114, 206, 0.2);
+				color: var(--cream);
+			}
+
 			.admin-logout-btn {
 				width: 100%;
 				text-align: left;
@@ -195,19 +228,26 @@ const { title, adminName, activeNav } = Astro.props;
 	<body>
 		<div class="admin-shell">
 			<aside class="admin-sidebar">
-				<p class="admin-brand">Hostel 3A</p>
-				<p class="admin-brand-sub">Адмін-панель</p>
+				<p class="admin-brand">{copy.brand}</p>
+				<p class="admin-brand-sub">{copy.brandSub}</p>
 				<nav>
 					<ul class="admin-nav">
-						<li><a href="/admin" class={activeNav === 'overview' ? 'is-active' : ''}>Огляд</a></li>
-						<li><a href="/admin/rooms" class={activeNav === 'rooms' ? 'is-active' : ''}>Номери</a></li>
-						<li><a href="/admin/guests" class={activeNav === 'guests' ? 'is-active' : ''}>Гості</a></li>
+						<li><a href="/admin" class={activeNav === 'overview' ? 'is-active' : ''}>{copy.overview}</a></li>
+						<li><a href="/admin/rooms" class={activeNav === 'rooms' ? 'is-active' : ''}>{copy.rooms}</a></li>
+						<li><a href="/admin/guests" class={activeNav === 'guests' ? 'is-active' : ''}>{copy.guests}</a></li>
 					</ul>
 				</nav>
 				<div class="admin-sidebar-foot">
 					{adminName && <p class="admin-who">{adminName}</p>}
+					<div class="admin-lang-switch">
+						{adminLocales.map((l) => (
+							<a href={`/admin/set-locale?locale=${l}&return=${returnTo}`} class={l === locale ? 'is-active' : ''}>
+								{l.toUpperCase()}
+							</a>
+						))}
+					</div>
 					<form method="POST" action="/admin/logout">
-						<button type="submit" class="admin-logout-btn">Вийти</button>
+						<button type="submit" class="admin-logout-btn">{copy.logout}</button>
 					</form>
 				</div>
 			</aside>

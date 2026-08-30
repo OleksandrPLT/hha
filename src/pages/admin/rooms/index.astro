@@ -3,6 +3,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { db } from '../../../db/client';
 import { admins, rooms, roomPhotos } from '../../../db/schema';
 import { eq, asc } from 'drizzle-orm';
+import { getAdminLocale, admin as adminCopy } from '../../../i18n/admin';
 
 export const prerender = false;
 
@@ -15,6 +16,9 @@ const admin = db.select().from(admins).where(eq(admins.id, adminId)).get();
 if (!admin) {
 	return Astro.redirect('/admin/login');
 }
+
+const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = adminCopy[locale].rooms;
 
 if (Astro.request.method === 'POST') {
 	const form = await Astro.request.formData();
@@ -60,27 +64,27 @@ function euro(cents: number | null): string {
 }
 ---
 
-<AdminLayout title="Номери" adminName={admin.fullName} activeNav="rooms">
+<AdminLayout title={copy.title} adminName={admin.fullName} activeNav="rooms">
 	<div class="page-head">
-		<h1>Номери</h1>
-		<a href="/admin/rooms/new" class="btn-primary">+ Додати номер</a>
+		<h1>{copy.title}</h1>
+		<a href="/admin/rooms/new" class="btn-primary">{copy.addBtn}</a>
 	</div>
-	<p class="page-subtitle">Порядок тут визначає порядок карток на сайті. "Активний" — вимикає показ на лендінгу без видалення.</p>
+	<p class="page-subtitle">{copy.subtitle}</p>
 
 	{
 		allRooms.length === 0 ? (
-			<p class="empty-note">Ще немає жодного номера.</p>
+			<p class="empty-note">{copy.empty}</p>
 		) : (
 			<div class="table-wrap">
 				<table>
 					<thead>
 						<tr>
 							<th></th>
-							<th>Назва (EN)</th>
-							<th>Slug</th>
-							<th>Ціна/ніч</th>
-							<th>Фото</th>
-							<th>Статус</th>
+							<th>{copy.colName}</th>
+							<th>{copy.colSlug}</th>
+							<th>{copy.colPrice}</th>
+							<th>{copy.colPhotos}</th>
+							<th>{copy.colStatus}</th>
 							<th></th>
 						</tr>
 					</thead>
@@ -91,14 +95,14 @@ function euro(cents: number | null): string {
 									<form method="POST">
 										<input type="hidden" name="action" value="move-up" />
 										<input type="hidden" name="roomId" value={room.id} />
-										<button type="submit" disabled={i === 0} aria-label="Вище">
+										<button type="submit" disabled={i === 0} aria-label={copy.up}>
 											↑
 										</button>
 									</form>
 									<form method="POST">
 										<input type="hidden" name="action" value="move-down" />
 										<input type="hidden" name="roomId" value={room.id} />
-										<button type="submit" disabled={i === allRooms.length - 1} aria-label="Нижче">
+										<button type="submit" disabled={i === allRooms.length - 1} aria-label={copy.down}>
 											↓
 										</button>
 									</form>
@@ -112,11 +116,11 @@ function euro(cents: number | null): string {
 										<input type="hidden" name="action" value="toggle-active" />
 										<input type="hidden" name="roomId" value={room.id} />
 										<button type="submit" class={room.isActive ? 'status-badge status-badge--active' : 'status-badge'}>
-											{room.isActive ? 'Активний' : 'Вимкнено'}
+											{room.isActive ? copy.active : copy.inactive}
 										</button>
 									</form>
 								</td>
-								<td><a href={`/admin/rooms/${room.id}`} class="edit-link">Редагувати</a></td>
+								<td><a href={`/admin/rooms/${room.id}`} class="edit-link">{copy.edit}</a></td>
 							</tr>
 						))}
 					</tbody>

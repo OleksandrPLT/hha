@@ -4,6 +4,7 @@ import { db } from '../../../db/client';
 import { admins, guests } from '../../../db/schema';
 import { eq, desc, like, or } from 'drizzle-orm';
 import { formatMemberId } from '../../../lib/memberCard';
+import { getAdminLocale, admin as adminCopy } from '../../../i18n/admin';
 
 export const prerender = false;
 
@@ -16,6 +17,10 @@ const admin = db.select().from(admins).where(eq(admins.id, adminId)).get();
 if (!admin) {
 	return Astro.redirect('/admin/login');
 }
+
+const locale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = adminCopy[locale].guestsList;
+const dateLocale = locale === 'ru' ? 'ru-RU' : 'uk-UA';
 
 const q = Astro.url.searchParams.get('q')?.trim() ?? '';
 
@@ -31,37 +36,37 @@ const rows = q
 function formatDate(raw: string): string {
 	const d = new Date(raw.includes(' ') ? raw.replace(' ', 'T') + 'Z' : raw);
 	if (Number.isNaN(d.getTime())) return raw;
-	return new Intl.DateTimeFormat('uk-UA', { dateStyle: 'medium' }).format(d);
+	return new Intl.DateTimeFormat(dateLocale, { dateStyle: 'medium' }).format(d);
 }
 ---
 
-<AdminLayout title="Гості" adminName={admin.fullName} activeNav="guests">
+<AdminLayout title={copy.title} adminName={admin.fullName} activeNav="guests">
 	<div class="page-head">
-		<h1>Гості</h1>
-		<p class="count-note">{rows.length} {q ? 'знайдено' : 'всього'}</p>
+		<h1>{copy.title}</h1>
+		<p class="count-note">{rows.length} {q ? copy.countFound : copy.countTotal}</p>
 	</div>
 
 	<form method="GET" class="search-form">
-		<input type="search" name="q" placeholder="Пошук за іменем, email або телефоном" value={q} />
-		<button type="submit">Знайти</button>
-		{q && <a href="/admin/guests" class="clear-link">Скинути</a>}
+		<input type="search" name="q" placeholder={copy.searchPlaceholder} value={q} />
+		<button type="submit">{copy.searchBtn}</button>
+		{q && <a href="/admin/guests" class="clear-link">{copy.reset}</a>}
 	</form>
 
 	{
 		rows.length === 0 ? (
-			<p class="empty-note">{q ? 'Нічого не знайдено.' : 'Ще жодного гостя не зареєструвалось.'}</p>
+			<p class="empty-note">{q ? copy.emptyFiltered : copy.emptyAll}</p>
 		) : (
 			<div class="table-wrap">
 				<table>
 					<thead>
 						<tr>
-							<th>ID</th>
-							<th>Ім'я</th>
-							<th>Email</th>
-							<th>Телефон</th>
-							<th>Тип</th>
-							<th>Бали</th>
-							<th>Реєстрація</th>
+							<th>{copy.colId}</th>
+							<th>{copy.colName}</th>
+							<th>{copy.colEmail}</th>
+							<th>{copy.colPhone}</th>
+							<th>{copy.colType}</th>
+							<th>{copy.colPoints}</th>
+							<th>{copy.colDate}</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -71,7 +76,7 @@ function formatDate(raw: string): string {
 								<td><a href={`/admin/guests/${g.id}`}>{g.fullName}</a></td>
 								<td>{g.email}</td>
 								<td>{g.phone}</td>
-								<td>{g.isCompany ? 'Юр. особа' : 'Фіз. особа'}</td>
+								<td>{g.isCompany ? copy.typeCompany : copy.typeIndividual}</td>
 								<td>{g.loyaltyPoints}</td>
 								<td>{formatDate(g.createdAt)}</td>
 							</tr>

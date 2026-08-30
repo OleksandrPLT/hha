@@ -7,6 +7,7 @@ import { db } from '../../../db/client';
 import { admins, rooms, roomPhotos } from '../../../db/schema';
 import { eq, asc, sql as sqlOp } from 'drizzle-orm';
 import { locales, localeNames } from '../../../i18n/locales';
+import { getAdminLocale, admin as adminCopy } from '../../../i18n/admin';
 
 export const prerender = false;
 
@@ -19,6 +20,9 @@ const admin = db.select().from(admins).where(eq(admins.id, adminId)).get();
 if (!admin) {
 	return Astro.redirect('/admin/login');
 }
+
+const adminLocale = getAdminLocale(Astro.cookies.get('admin_locale')?.value);
+const copy = adminCopy[adminLocale].roomEdit;
 
 const rawId = Astro.params.id;
 const isNew = rawId === 'new';
@@ -72,11 +76,11 @@ if (Astro.request.method === 'POST') {
 		}
 
 		if (!slug || !titles.en || pricePerNightCents == null) {
-			error = "Заповніть slug, назву англійською і ціну за ніч.";
+			error = copy.errorRequired;
 		} else {
 			const existingSlug = db.select().from(rooms).where(eq(rooms.slug, slug)).get();
 			if (existingSlug && existingSlug.id !== roomId) {
-				error = 'Такий slug вже використовується іншим номером.';
+				error = copy.errorSlugTaken;
 			} else if (isNew) {
 				const maxOrder = db.select({ max: sqlOp<number>`max(sort_order)` }).from(rooms).get();
 				const inserted = db
@@ -157,40 +161,40 @@ function centsToEuros(cents: number | null | undefined): string {
 }
 ---
 
-<AdminLayout title={isNew ? 'Новий номер' : titles.en ?? room?.slug ?? 'Номер'} adminName={admin.fullName} activeNav="rooms">
-	<a href="/admin/rooms" class="back-link">← Усі номери</a>
-	<h1>{isNew ? 'Новий номер' : titles.en ?? room?.slug}</h1>
+<AdminLayout title={isNew ? copy.titleNew : titles.en ?? room?.slug ?? ''} adminName={admin.fullName} activeNav="rooms">
+	<a href="/admin/rooms" class="back-link">{copy.back}</a>
+	<h1>{isNew ? copy.titleNew : titles.en ?? room?.slug}</h1>
 
-	{updatedNotice && <p class="notice notice--success">Збережено.</p>}
+	{updatedNotice && <p class="notice notice--success">{copy.savedNotice}</p>}
 	{error && <p class="notice notice--error">{error}</p>}
 
 	<div class="grid-2">
 		<section class="card">
-			<h2>Основне</h2>
+			<h2>{copy.basicSection}</h2>
 			<form method="POST" class="room-form" id="room-form">
 				<input type="hidden" name="action" value="save" />
 				<label>
-					Slug (латиницею, унікальний)
-					<input type="text" name="slug" required value={room?.slug ?? ''} placeholder="напр. deluxe-double" />
+					{copy.slug}
+					<input type="text" name="slug" required value={room?.slug ?? ''} placeholder={copy.slugPlaceholder} />
 				</label>
 
 				<div class="field-row">
 					<label>
-						Ціна/ніч (€)
+						{copy.priceNight}
 						<input type="number" step="0.01" name="pricePerNight" required value={centsToEuros(room?.pricePerNightCents)} />
 					</label>
 					<label>
-						Ціна/тиждень (€, необов'язково)
+						{copy.priceWeek}
 						<input type="number" step="0.01" name="priceWeek" value={centsToEuros(room?.priceWeekCents)} />
 					</label>
 				</div>
 				<div class="field-row">
 					<label>
-						Ціна/2 тижні (€, необов'язково)
+						{copy.priceTwoWeeks}
 						<input type="number" step="0.01" name="priceTwoWeeks" value={centsToEuros(room?.priceTwoWeeksCents)} />
 					</label>
 					<label>
-						Ціна/місяць (€, необов'язково)
+						{copy.pricePerMonth}
 						<input type="number" step="0.01" name="pricePerMonth" value={centsToEuros(room?.pricePerMonthCents)} />
 					</label>
 				</div>
@@ -206,43 +210,43 @@ function centsToEuros(cents: number | null | undefined): string {
 					{locales.map((l, i) => (
 						<div class="locale-tab-panel" data-locale-panel={l} hidden={i !== 0}>
 							<label>
-								Назва номера
+								{copy.nameField}
 								<input type="text" name={`title_${l}`} required={l === 'en'} value={titles[l] ?? ''} />
 							</label>
 							<label>
-								Ліжка
-								<input type="text" name={`beds_${l}`} value={beds[l] ?? ''} placeholder="напр. 1 double bed" />
+								{copy.bedsField}
+								<input type="text" name={`beds_${l}`} value={beds[l] ?? ''} placeholder={copy.bedsPlaceholder} />
 							</label>
 							<label>
-								Гостей
-								<input type="text" name={`guests_${l}`} value={guests[l] ?? ''} placeholder="напр. 2 guests" />
+								{copy.guestsField}
+								<input type="text" name={`guests_${l}`} value={guests[l] ?? ''} placeholder={copy.guestsPlaceholder} />
 							</label>
 						</div>
 					))}
 				</div>
 
-				<button type="submit" class="btn-primary">{isNew ? 'Створити номер' : 'Зберегти зміни'}</button>
+				<button type="submit" class="btn-primary">{isNew ? copy.createBtn : copy.saveBtn}</button>
 			</form>
 
 			{!isNew && (
-				<form method="POST" class="delete-room-form" onsubmit="return confirm('Видалити цей номер і всі його фото назавжди?')">
+				<form method="POST" class="delete-room-form" onsubmit={`return confirm(${JSON.stringify(copy.confirmDelete)})`}>
 					<input type="hidden" name="action" value="delete-room" />
-					<button type="submit" class="btn-danger-text">Видалити номер</button>
+					<button type="submit" class="btn-danger-text">{copy.deleteRoom}</button>
 				</form>
 			)}
 		</section>
 
 		<section class="card">
-			<h2>Фото</h2>
+			<h2>{copy.photosSection}</h2>
 			{isNew ? (
-				<p class="empty-note">Спершу створіть номер, потім можна буде додавати фото.</p>
+				<p class="empty-note">{copy.noPhotosNew}</p>
 			) : (
 				<Fragment>
 					<label class="photo-upload-label">
-						Завантажити фото
+						{copy.uploadBtn}
 						<input type="file" id="photo-input" accept="image/*" hidden />
 					</label>
-					<p class="photo-hint">Перше фото в списку — те, що показується на картці номера на сайті.</p>
+					<p class="photo-hint">{copy.photoHint}</p>
 
 					<form method="POST" id="add-photo-form" hidden>
 						<input type="hidden" name="action" value="add-photo" />
@@ -250,7 +254,7 @@ function centsToEuros(cents: number | null | undefined): string {
 					</form>
 
 					{photos.length === 0 ? (
-						<p class="empty-note">Ще немає фото — використовується заглушка на сайті.</p>
+						<p class="empty-note">{copy.noPhotos}</p>
 					) : (
 						<ul class="photo-list">
 							{photos.map((p, i) => (
@@ -270,7 +274,7 @@ function centsToEuros(cents: number | null | undefined): string {
 										<form method="POST">
 											<input type="hidden" name="action" value="delete-photo" />
 											<input type="hidden" name="photoId" value={p.id} />
-											<button type="submit" class="danger">Видалити</button>
+											<button type="submit" class="danger">{copy.deletePhoto}</button>
 										</form>
 									</div>
 								</li>
